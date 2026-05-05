@@ -1,39 +1,55 @@
-# Übungsblatt 1 | Agentic AI WP | Thomas Clemen
+# Übungsblatt 01 – Projektdefinition & Agentenanalyse
 
-**Gruppe 2 – Nicola Ye, Frithjof Beims, David Grigutsch, Colvin Sowa, Jannis Martensen, Sebastian Hauschild**
+## Projektname
 
-## Elevatorpitch für StudyMummy
+**StudyMummy – Agentic AI Learning Platform**
 
-StudyMummy ist ein proaktiver KI-Mentor, der Schüler nicht durch das bloße Vorsagen von Lösungen, sondern durch gezielte sokratische Fragen und adaptive Hilfestellungen zum eigenständigen Lernerfolg führt. Dank Agentic AI erkennt die App individuelle Wissenslücken in Echtzeit, passt ihre Erklärstrategie dynamisch an den Lernfortschritt an und festigt das Verständnis durch maßgeschneiderte Transferaufgaben. So wird aus passivem Abschreiben aktives Begreifen, das sich exakt am Tempo und den Bedürfnissen des Lernenden orientiert.
+## 1. Elevator Pitch
 
-## 1. PEAS-Analyse
+StudyMummy ist eine KI-gestützte Lernplattform für Schüler, Studierende, Auszubildende und Selbstlerner. Nutzer können Aufgabenblätter, PDFs, Screenshots oder andere Lernmaterialien hochladen und werden anschließend von einem intelligenten Tutor-Agenten Schritt für Schritt beim Verstehen und Lösen der Aufgaben unterstützt.
 
-| Komponente | Beschreibung für StudyMummy |
+Im Gegensatz zu einem normalen Chatbot gibt StudyMummy nicht einfach sofort die Lösung aus. Der Agent analysiert die Aufgaben, erkennt Themen und Schwierigkeiten, stellt gezielte sokratische Fragen, bewertet Antworten, passt Hilfestellungen an den Lernstand an und entscheidet, wann Wiederholung oder ein Lernspiel sinnvoll ist. Zusätzlich erstellt StudyMummy am Ende einer Lerneinheit ein persönliches Cheatsheet und belohnt Lernfortschritt durch virtuelle Währung.
+
+---
+
+## 2. PEAS-Analyse
+
+| PEAS-Komponente | Beschreibung für StudyMummy |
 |---|---|
-| **Performance Measure (Erfolg)** | - Lernfortschritt: Korrekte Beantwortung von Transferaufgaben durch den Schüler.<br>- Verständnis-Rate: Weniger Rückfragen bei ähnlichen Problemen.<br>- Engagement: Zeit, die der Schüler aktiv mit dem Tutor verbringt.<br>- Effizienz: Minimale Anzahl an Hinweisen bis zur selbstständigen Lösung. |
-| **Environment (Umgebung)** | - Das Interface der App (Chat/Whiteboard).<br>- Die digitale Wissensdatenbank (Lehrpläne, Fachwissen).<br>- Der aktuelle kognitive Zustand des Schülers (indirekt). |
-| **Actuators (Aktoren)** | - Textausgabe: Sokratische Fragen, Erklärungen, Lob/Motivation.<br>- Inhaltserstellung: Generierung von Übungsaufgaben oder Grafiken.<br>- UI-Elemente: Markierungen auf dem virtuellen Whiteboard setzen. |
-| **Sensors (Sensoren)** | - Vision: Kamera/Upload von Aufgaben (Texterkennung/OCR).<br>- Text-Input: Antworten und Fragen des Schülers im Chat.<br>- Metadaten: Antwortzeit, Korrekturhäufigkeit des Schülers, Tippverhalten. |
+| **Performance Measure** | Erfolg erkennt man daran, dass Nutzer Aufgaben besser verstehen, Aufgaben korrekt lösen, weniger wiederholte Fehler machen, Schwächen gezielt verbessern und motiviert weiterlernen. Weitere Messgrößen sind gelöste Aufgaben, korrekte Antworten, Verbesserung des Confidence-Scores pro Thema, erfolgreich abgeschlossene Lernspiele, sinnvolle Cheatsheets und Nutzerzufriedenheit. |
+| **Environment** | Die Umgebung besteht aus der Lernplattform, den hochgeladenen Lernmaterialien, den einzelnen Aufgaben, dem aktuellen Lernstand des Nutzers, den Interaktionen im Chat, den generierten Spielen, dem Game Tab und dem persönlichen Fortschrittsprofil. Außerdem gehören verschiedene Fächer wie Mathematik, Informatik, Englisch oder Naturwissenschaften zur Umgebung. |
+| **Actuators** | Der Agent kann Aufgaben strukturieren, Hinweise geben, Rückfragen stellen, Erklärungen erzeugen, Antworten bewerten, Fehler markieren, Lernfortschritt aktualisieren, Wiederholungen empfehlen, Lernspiele starten, Quizfragen generieren, virtuelle Währung vergeben und Cheatsheets erstellen. |
+| **Sensors** | Der Agent erhält Eingaben durch hochgeladene PDFs, Screenshots, Fotos, Word-Dokumente, Textaufgaben, Nutzerantworten, Chatnachrichten, ausgewählte Fächer, Aufgabenstatus, bisherige Fehler, Lernhistorie, Confidence-Werte und Spielergebnisse. |
 
-## 2. Umgebungseigenschaften (7 Dimensionen)
+---
 
-**Wie komplex ist die Welt, in der StudyMummy arbeitet?**
+## 3. Umgebungseigenschaften
 
-1. **Partially Observable:** Der Agent sieht zwar die Aufgabe, aber nicht direkt in den Kopf des Schülers. Er muss den Wissensstand aus den Antworten erschließen.
-2. **Stochastic:** Die Reaktion des Schülers ist nicht zu 100% vorhersagbar. Auf dieselbe Frage können völlig unterschiedliche Antworten folgen.
-3. **Sequential:** Eine Antwort baut auf der vorherigen auf. Die Entscheidung, jetzt einen Tipp zu geben, beeinflusst, wie der Schüler die nächste Aufgabe versteht.
-4. **Dynamic:** Die Umgebung ist technisch gesehen static, während die KI nachdenkt, aber dynamic im Sinne des Lernprozesses: Die Frustration oder Aufmerksamkeit des Schülers ändert sich über die Zeit.
-5. **Discrete:** Die Interaktion findet in abgeschlossenen Schritten statt (Nachricht schicken, Aufgabe lösen, Feedback erhalten).
-6. **Multi-Agent:** Es gibt mindestens zwei Agenten: Die KI (Tutor) und den Menschen (Schüler), deren Ziele (Lernen vs. schnelle Lösung) manchmal konkurrieren.
-7. **Known:** Die Regeln der Fachbereiche (z. B. Mathematik oder Grammatik) sind dem System bekannt und fest definiert.
+| Dimension | Einordnung | Begründung |
+|---|---|---|
+| **Fully / Partially Observable** | **Partially observable** | Der Agent sieht zwar hochgeladene Aufgaben, Chatantworten und gespeicherte Lernfortschritte, aber er kennt nicht vollständig den tatsächlichen Wissensstand, die Motivation oder das Verständnis des Nutzers. Diese müssen aus den Antworten und Fehlern geschätzt werden. |
+| **Deterministic / Stochastic** | **Stochastic** | Gleiche Aufgaben können bei verschiedenen Nutzern zu unterschiedlichen Antworten, Fehlern und Lernverläufen führen. Außerdem können LLM-Antworten variieren. Der Agent arbeitet daher mit Unsicherheit. |
+| **Episodic / Sequential** | **Sequential** | Jede Interaktion beeinflusst spätere Entscheidungen. Wenn ein Nutzer zum Beispiel mehrfach Fehler bei linearen Funktionen macht, beeinflusst das zukünftige Hinweise, Wiederholungen, Quizfragen und Cheatsheet-Inhalte. |
+| **Static / Dynamic** | **Dynamic** | Die Umgebung verändert sich während der Nutzung: Aufgabenstatus wechseln von „Open“ zu „Solved“ oder „Repeat“, Confidence-Werte verändern sich, neue Fehler werden erkannt und Spiele können neue Lernstände erzeugen. |
+| **Discrete / Continuous** | **Überwiegend discrete, teilweise continuous** | Viele Elemente sind diskret, zum Beispiel Aufgaben, Antwortversuche, Statuswerte, Spielrunden und Quizfragen. Gleichzeitig gibt es kontinuierliche bzw. graduelle Werte wie Confidence-Scores, Fortschrittswerte oder Schwierigkeitsanpassungen. |
+| **Single-Agent / Multi-Agent** | **Konzeptionell Multi-Agent, MVP eher orchestrierter Single-Agent** | Die Idee enthält mehrere spezialisierte Rollen wie Upload Analyzer Agent, Tutor Agent, Evaluation Agent, Learning Profile Agent, Progress Agent, Game Generator Agent und Cheatsheet Agent. Für das MVP kann dies zunächst als ein zentraler Agent mit mehreren Funktionen umgesetzt werden. |
+| **Known / Unknown** | **Partially unknown** | Die grundlegenden Regeln der Plattform sind bekannt, zum Beispiel Upload, Aufgabenanalyse, Tutor-Chat und Quiz. Unbekannt sind jedoch die konkreten Inhalte der hochgeladenen Aufgaben, die Qualität der Nutzerantworten, individuelle Wissenslücken und mögliche Missverständnisse. |
 
-## 3. Agententyp: Learning Agent
+---
 
-StudyMummy kommt dem **Learning Agent** am nächsten.
+## 4. Agententyp
 
-**Begründung:**
+StudyMummy kommt am nächsten an einen **Learning Agent** heran.
 
-- **Performance Element:** Er fungiert als Tutor und gibt Hinweise (das operative Geschäft).
-- **Critic:** Er vergleicht die Antwort des Schülers mit der Ideallösung und bewertet, ob der aktuelle Lehransatz funktioniert.
-- **Learning Element:** Der Agent lernt über die Zeit, welche Erklärungen oder Analogien bei diesem spezifischen Schüler am besten funktionieren (Personalisierung).
-- **Problem Generator:** Er erstellt proaktiv neue Aufgaben, um Wissenslücken zu testen und das System „herauszufordern“, damit der Schüler nicht nur auswendig lernt.
+StudyMummy besitzt Merkmale mehrerer Agententypen:
+
+| Agententyp | Bezug zu StudyMummy |
+|---|---|
+| **Simple Reflex Agent** | Teilweise bei einfachen Regeln, z. B. wenn eine Antwort leer ist, fordert der Agent eine neue Eingabe an. |
+| **Model-Based Agent** | Der Agent nutzt ein internes Modell über Aufgabenstatus, Themen, Schwächen und Lernfortschritt. |
+| **Goal-Based Agent** | Das Ziel ist, dass der Nutzer Aufgaben versteht, korrekt löst und Schwächen verbessert. |
+| **Utility-Based Agent** | Der Agent kann zwischen verschiedenen nächsten Aktionen abwägen, z. B. weiterer Hinweis, neue Aufgabe, Wiederholung oder Spielmodus. |
+| **Learning Agent** | Der Agent aktualisiert das Lernprofil anhand von Nutzerantworten und passt zukünftige Hilfen, Wiederholungen, Spiele und Cheatsheets daran an. |
+
+**Begründung:**  
+StudyMummy ist ein Learning Agent, weil das System nicht nur einzelne Antworten erzeugt, sondern aus Nutzerinteraktionen ein Lernprofil ableitet. Dieses Profil beeinflusst spätere Entscheidungen, zum Beispiel welches Hilfeniveau gewählt wird, welche Themen wiederholt werden sollen, welche Quizfragen generiert werden und welche Inhalte im Cheatsheet besonders hervorgehoben werden.
