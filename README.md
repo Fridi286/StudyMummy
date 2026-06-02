@@ -321,3 +321,302 @@ Wenn der Agent bereits bei der Extraktion Fehler macht, können alle weiteren Sc
 | Memory           | Wie werden Confidence-Werte berechnet? Wie lange sollen Lernverläufe gespeichert werden?                                                  |
 | Sicherheit       | Wie verhindern wir, dass der Agent sofort komplette Lösungen ausgibt, obwohl sokratisches Lernen gewünscht ist?                           |
 | MVP-Einschränkung| Starten wir zuerst nur mit Mathematik? Unterstützen wir zuerst nur Text/PDF statt Fotos und Handschrift?                                 |
+
+
+# StudyMummy – Implementierungsdokumentation
+
+**Übungsblatt 03: Erste Implementierung – LLM, RAG & Tool Use**
+WP Agentic AI | HAW Hamburg | SS 2026
+
+---
+
+## Überblick
+
+Dieses Dokument beschreibt die Implementierung der drei Meilensteine aus Übungsblatt 03. Das Ziel war es, das StudyMummy-System vom Architekturentwurf (Übungsblatt 02) in einen lauffähigen Prototypen zu überführen: mit LLM-Anbindung, Tool Use via Function Calling und einem RAG-Grundgerüst für die Retrieval-Pipeline.
+
+---
+
+## Meilenstein 1 – LLM-Anbindung & Grundgerüst
+
+### Entwicklungsumgebung
+
+Das Projekt wurde als Python-Package mit `pyproject.toml` aufgesetzt und verwendet `uv` als Package-Manager. Die Abhängigkeiten sind in zwei Gruppen unterteilt: Basis-Dependencies und optionale RAG-Erweiterungen.
+
+**Verwendeter Tech-Stack:**
+
+| Komponente | Technologie | Begründung |
+|---|---|---|
+| Web-Framework | FastAPI 0.115+ | Async-native, automatische OpenAPI-Docs, Pydantic-Integration |
+| LLM-Provider | OpenAI (`gpt-4o-mini`) | Supports Function Calling, günstig für Prototyp |
+| Konfiguration | Pydantic Settings | Typsichere Env-Variablen, `.env`-Support |
+| Laufzeitumgebung | Python 3.11+ | `asyncio`-native, `match`-Statement |
+| Build-System | Hatchling | Leichtgewichtig, kein `setup.py` nötig |
+
+```
+pyproject.toml  →  [tool.hatch.build.targets.wheel]
+                    packages = ["app"]
+```
+
+> **Hinweis:** Hatchling sucht standardmäßig nach einem Verzeichnis mit demselben Namen wie das Projekt. Da das Package-Verzeichnis `app/` heißt (nicht `studymummy/`), muss der Pfad explizit konfiguriert werden.
+
+### System Prompt – Sokratisches Prinzip
+
+Der Agent erhält einen festen System Prompt, der das sokratische Lehrprinzip implementiert: Rückfragen statt direkter Lösungen, dynamisches Hilfeniveau (Level 1–3), Motivationssprache und automatisches Lernprofil-Update.
+
+```python
+# app/services/llm_service.py
+SOCRATIC_SYSTEM_PROMPT = """Du bist StudyMummy, ein sokratischer Tutor-Agent.
+Gib NIEMALS direkt die Lösung, wenn der Nutzer noch nicht nachgedacht hat.
+Hilfeniveau: Level 1 = Hinweis, Level 2 = Teilanleitung, Level 3 = Musterlösung."""
+```
+
+### Grenzen des reinen LLM-Calls
+
+Ein erster Test ohne Tools zeigt die typischen Einschränkungen:
+
+- **Fehlende Persistenz:** Das Modell kennt keinen Lernfortschritt aus vorherigen Sitzungen.
+- **Keine Aktionen:** Der Agent kann keine Lernprofile aktualisieren oder Coins vergeben.
+- **Kontextgröße:** Lange Arbeitsblätter überschreiten das Context Window.
+- **Halluziniertes Fachwissen:** Domänenspezifische Formeln sind nicht zuverlässig korrekt.
+
+---
+
+## Meilenstein 2 – Tool Use: Die erste Lücke schließen
+
+### Entscheidung: Tool Use (Option B) zuerst
+
+Die Entscheidung fiel auf **Tool Use** statt RAG, weil die Agent-Action-Schicht (Lernprofil-Updates, Bewertung, Gamification) für den sokratischen Tutor-Loop unmittelbarer notwendig ist als semantische Suche. RAG wurde als Grundgerüst vorbereitet und kann in Meilenstein 3 vollständig integriert werden.
+
+### Tool-Registry
+
+Ein zentrales Registry-Pattern entkoppelt die Tools vollständig von der LLM-Logik. Neue Tools lassen sich registrieren, ohne die Agent-Orchestrierung zu ändern:
+
+```python
+# app/tools/registry.py
+@dataclass
+class ToolDefinition:
+    name: str
+    description: str
+    parameters: dict   # JSON Schema
+    fn: ToolFn         # async Callable
+
+def register(tool: ToolDefinition) -> ToolDefinition:
+    _REGISTRY[tool.name] = tool
+    return tool
+
+def as_openai_tools() -> list[dict]:
+    """Gibt alle registrierten Tools im OpenAI Function-Calling-Format zurück."""
+    ...
+```
+
+### Implementierte Tools (Mock-Implementierungen)
+
+Alle fünf Tools sind als Mock-Funktionen implementiert, die sofort per Function Calling aufrufbar sind. Die echte Geschäftslogik kann schrittweise eingebaut werden.
+
+| Tool | Schicht | Beschreibung | Seiteneffekte |
+|---|---|---|---|
+| `evaluate_answer` | Action | Bewertet Nutzerantwort (korrekt / falsch) | Nein |
+| `update_learning_profile` | Action | Speichert Confidence-Wert pro Thema | Ja – Nutzerprofil |
+| `generate_quiz_questions` | Action | Erstellt Multiple-Choice-Fragen | Nein |
+| `create_cheatsheet` | Action | Erzeugt persönliches Cheatsheet | Ja – neues Dokument |
+| `award_coins` | Action | Vergibt virtuelle Währung | Ja – Kontostand |
+
+> **Sicherheitshinweis (Übungsblatt 06-Vorbereitung):** Tools mit Seiteneffekten (`update_learning_profile`, `create_cheatsheet`, `award_coins`) werden in der Fehlerbehandlung besonders behandelt. Fehler werden geloggt und geben strukturierte Error-Responses zurück, anstatt Exceptions zu werfen.
+
+### ReAct-Loop (Thought → Action → Observation)
+
+Der LLM-Service implementiert den ReAct-Loop mit einem Guardrail bei maximal 5 Iterationen:
+
+```python
+# app/services/llm_service.py – vereinfacht
+for _ in range(5):                        # Guardrail: max 5 Iterationen
+    response = await openai.chat(...)
+    if not response.tool_calls:
+        return response.content           # Thought → fertig
+    for tc in response.tool_calls:        # Action
+        result = await execute_tool(tc)   # Observation
+        messages.append(tool_result)      # zurück in den Loop
+```
+
+**Ablauf am Beispiel:**
+1. Nutzer: *„Ich verstehe die Nullstelle nicht"*
+2. LLM denkt nach (Thought) → ruft `evaluate_answer` auf (Action)
+3. Tool gibt `{"is_correct": false, "feedback": "..."}` zurück (Observation)
+4. LLM formuliert sokratische Rückfrage basierend auf dem Feedback
+5. Falls korrekt: `award_coins` + `update_learning_profile` werden ausgelöst
+
+### RAG-Grundgerüst
+
+Parallel zu Tool Use wurde ein RAG-Service als In-Memory-Grundgerüst implementiert:
+
+```python
+# app/services/rag_service.py
+class RAGService:
+    def add_document(self, doc_id, text, metadata): ...
+    def retrieve(self, query, top_k=3) -> str: ...  # Mock: gibt erste k Dokumente zurück
+```
+
+Der RAG-Kontext wird bei jedem Chat-Call als zweite System-Message an das LLM übergeben. Der Austausch gegen ChromaDB (echtes Embedding-Retrieval) erfordert nur eine Änderung in `rag_service.py`, ohne die API-Schicht zu berühren.
+
+---
+
+## Meilenstein 3 – Erster End-to-End-Durchlauf
+
+### API-Endpunkte
+
+Das Backend stellt folgende Endpunkte unter `/api/v1` bereit:
+
+| Methode | Pfad | Beschreibung | Kognitive Schicht |
+|---|---|---|---|
+| `POST` | `/agent/chat` | Sokratischer Tutor-Chat mit Tool Use | Planning + Action |
+| `POST` | `/agent/upload` | Dokument hochladen & Aufgaben extrahieren | Perception |
+| `POST` | `/agent/quiz` | Quiz zu einem Thema generieren | Action |
+| `POST` | `/agent/cheatsheet` | Personalisiertes Cheatsheet erstellen | Action |
+| `GET` | `/memory/session/{id}` | Working Memory einer Session | Memory |
+| `GET` | `/memory/profile/{id}` | Lernprofil eines Nutzers | Memory |
+| `POST/GET/PATCH/DELETE` | `/tasks/` | Task-CRUD | Perception-Output |
+| `GET` | `/health` | Systemstatus | – |
+
+### Vollständiger Durchlauf
+
+**Schritt 1 – Dokument hochladen (Perception)**
+
+```bash
+curl -X POST http://localhost:8000/api/v1/agent/upload \
+  -F "file=@aufgabenblatt.txt"
+```
+
+Rückgabe: strukturiertes JSON mit extrahierten Tasks (task_id, subject, topic, difficulty, required_concepts, status: "open") – identisch mit dem internen Aufgabenformat aus Übungsblatt 02.
+
+**Schritt 2 – Chat starten (Planning + Action)**
+
+```bash
+curl -X POST http://localhost:8000/api/v1/agent/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "session_id": "sess_001",
+    "user_id": "student_42",
+    "message": "Was ist eine Nullstelle?",
+    "task_id": "task_01"
+  }'
+```
+
+Rückgabe:
+```json
+{
+  "session_id": "sess_001",
+  "message": "Gute Frage! Was denkst du: Wo schneidet ein Graph die x-Achse?",
+  "action_taken": "evaluate_answer",
+  "tool_calls": ["evaluate_answer"],
+  "trace_id": "a3f9b1c2"
+}
+```
+
+**Schritt 3 – Lernprofil prüfen (Memory)**
+
+```bash
+curl http://localhost:8000/api/v1/memory/profile/student_42
+```
+
+### Was funktioniert / Was bricht
+
+| Aspekt | Status | Anmerkung |
+|---|---|---|
+| LLM-Call mit System Prompt | ✅ Funktioniert | Sokratische Antworten wie erwartet |
+| Tool Use (Function Calling) | ✅ Funktioniert | Mock-Rückgaben korrekt in Loop eingebaut |
+| Dokument-Upload & Task-Extraktion | ✅ Funktioniert | Nur Plain-Text/UTF-8; kein PDF-Parsing |
+| Working Memory (Dialog-History) | ✅ Funktioniert | In-Memory, max. 20 Turns |
+| RAG-Retrieval | ⚠️ Mock | Kein echtes Embedding, nur sequentielle Ausgabe |
+| Lernprofil-Persistenz | ⚠️ In-Memory | Geht beim Neustart verloren |
+| PDF-Parsing (PyMuPDF) | ❌ Nicht implementiert | Dependency vorbereitet in `pyproject.toml` |
+| Echte Similarity-Suche | ❌ Nicht implementiert | ChromaDB-Anbindung für Übungsblatt 04 |
+
+---
+
+## Projektstruktur
+
+```
+studymummy/
+├── pyproject.toml                   ← Package-Konfiguration
+├── .env.example                     ← Konfigurationsvorlage
+├── app/
+│   ├── main.py                      ← FastAPI App Factory + Lifespan
+│   ├── core/
+│   │   ├── config.py                ← Pydantic Settings
+│   │   └── logging.py               ← trace_id-Logging (Observability)
+│   ├── api/v1/
+│   │   ├── router.py                ← Zentraler v1-Router
+│   │   └── endpoints/
+│   │       ├── agent.py             ← Chat, Upload, Quiz, Cheatsheet
+│   │       ├── memory.py            ← Session & Lernprofil
+│   │       └── tasks.py             ← Task-CRUD
+│   ├── services/
+│   │   ├── llm_service.py           ← OpenAI-Anbindung + ReAct-Loop
+│   │   ├── rag_service.py           ← RAG-Grundgerüst
+│   │   └── session_service.py       ← Working Memory + Lernprofile
+│   ├── tools/
+│   │   ├── registry.py              ← Zentrales Tool-Registry
+│   │   └── study_tools.py           ← 5 Agent-Tools (Mock)
+│   ├── middleware/
+│   │   └── logging_middleware.py    ← Request-Tracing
+│   └── models/
+│       ├── task.py                  ← Task, TaskStatus
+│       ├── memory.py                ← WorkingMemory, LearningProfile
+│       └── agent.py                 ← Request/Response-Schemas
+└── tests/
+    ├── test_tasks.py                ← CRUD-Tests (deterministisch)
+    ├── test_tools.py                ← Tool-Tests (semantische Assertions)
+    └── test_agent_endpoints.py      ← Integrationstests (LLM gemockt)
+```
+
+---
+
+## Observability & Tracing
+
+Jeder eingehende Request erhält eine zufällige `trace_id` (8-stellig hex). Diese wird durch alle Service-Aufrufe weitergereicht und in jedem Log-Eintrag angezeigt:
+
+```
+2026-05-19 13:20:01 [INFO] trace=a3f9b1c2 llm_service: LLM call started, messages=3
+2026-05-19 13:20:01 [INFO] trace=a3f9b1c2 llm_service: Tool call: evaluate_answer(...)
+2026-05-19 13:20:02 [INFO] trace=a3f9b1c2 llm_service: LLM finished, tools_called=['evaluate_answer']
+2026-05-19 13:20:02 [INFO] trace=a3f9b1c2 logging_middleware: POST /api/v1/agent/chat → 200 (1243.5ms)
+```
+
+Die `trace_id` wird auch im Response-Header `X-Trace-Id` und im JSON-Body zurückgegeben, sodass Frontend-Logs mit Backend-Logs korreliert werden können.
+
+---
+
+## Nächste Schritte (Übungsblatt 04+)
+
+| Aufgabe | Priorität | Ziel-Termin |
+|---|---|---|
+| ChromaDB-Anbindung für echtes Embedding-Retrieval | Hoch | Übungsblatt 04 |
+| PyMuPDF für PDF-Upload | Hoch | Übungsblatt 04 |
+| PostgreSQL / Supabase für persistente Sessions | Mittel | Übungsblatt 04 |
+| Multi-Agent: Orchestrator + Worker | Mittel | Übungsblatt 04 |
+| Semantische Tests für LLM-Antworten | Hoch | Übungsblatt 05 |
+| Guardrails gegen Prompt Injection | Hoch | Übungsblatt 06 |
+
+---
+
+## Quickstart
+
+```bash
+# 1. Projekt klonen und Dependencies installieren
+uv pip install -e ".[rag]"
+
+# 2. Umgebungsvariablen setzen
+cp .env.example .env
+# OPENAI_API_KEY=sk-... in .env eintragen
+
+# 3. Server starten
+uvicorn app.main:app --reload
+
+# 4. Interaktive API-Dokumentation
+open http://localhost:8000/docs
+
+# 5. Tests ausführen (kein API-Key benötigt)
+pip install -e ".[dev]"
+pytest tests/ -v
+```
+
