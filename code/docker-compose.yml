@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: studymummy_db
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-studymummy}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Mount initialization script to auto-run on container start
+      - ./app/db/db_init.sql:/docker-entrypoint-initdb.d/db_init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d studymummy"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: .
+    container_name: studymummy_web
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - APP_NAME=StudyMummy API
+      - APP_ENV=development
+      - LOG_LEVEL=INFO
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/studymummy
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - HAW_ICC_API_KEY=${HAW_ICC_API_KEY}
+      - HAW_ICC_BASE_URL=${HAW_ICC_BASE_URL}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      # Optional: bind mount code for live reloading during development
+      - ./app:/app/app
+
+volumes:
+  postgres_data:

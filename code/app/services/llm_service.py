@@ -3,7 +3,13 @@ LLM-Service: kapselt alle OpenAI-Calls mit Tool Use (Function Calling).
 Zentrale Stelle für alle LLM-Interaktionen – leicht gegen ein anderes LLM austauschbar.
 """
 import json
-from typing import Any, Optional
+from typing import Optional, cast
+from openai.types.chat import (
+    ChatCompletionMessageParam, 
+    ChatCompletionToolParam,
+    ChatCompletionToolMessageParam,
+    ChatCompletionUserMessageParam,
+)
 from openai import AsyncOpenAI
 from app.core.config import get_settings
 from app.core.logging import get_logger, get_trace_id
@@ -26,15 +32,19 @@ Prinzipien:
 class LLMService:
     def __init__(self):
         settings = get_settings()
-        self.client = AsyncOpenAI(api_key=settings.openai_api_key)
+        self.client = AsyncOpenAI(
+            api_key=settings.openai_api_key,
+            base_url=settings.openai_base_url
+        )
+        log.info(f"LLMService initialized. Base URL: {settings.openai_base_url}")
         self.model = settings.openai_model
         self.temperature = settings.openai_temperature
 
     async def chat_with_tools(
         self,
-        messages: list[dict[str, Any]],
+        messages: list[ChatCompletionMessageParam],
         system_prompt: str = SOCRATIC_SYSTEM_PROMPT,
-        extra_context: Optional[str] = None,
+        extra_context: str | None = None,
     ) -> tuple[str, list[str]]:
         """
         Führt einen LLM-Call mit Tool Use durch (ReAct-Loop).
@@ -43,7 +53,7 @@ class LLMService:
         trace = get_trace_id()
         log.info(f"[{trace}] LLM call started, messages={len(messages)}")
 
-        full_messages = [{"role": "system", "content": system_prompt}]
+        full_messages: list[ChatCompletionMessageParam] = [{"role": "system", "content": system_prompt}]
         if extra_context:
             full_messages.append({
                 "role": "system",
@@ -54,20 +64,25 @@ class LLMService:
         tools = as_openai_tools()
         tool_calls_made: list[str] = []
 
+        kwargs = {}
+        # HAW Proxy doesn't support tools for qwen2.5-7b
+        if tools and self.model != "qwen2.5-7b":
+            kwargs["tools"] = cast(list[ChatCompletionToolParam], tools)
+            kwargs["tool_choice"] = "auto"
+
         # ReAct-Loop: Thought → Action → Observation
         for _ in range(5):  # max 5 Iterationen als Guardrail
             response = await self.client.chat.completions.create(
                 model=self.model,
                 temperature=self.temperature,
                 messages=full_messages,
-                tools=tools if tools else None,
-                tool_choice="auto" if tools else None,
+                **kwargs
             )
 
             choice = response.choices[0]
             assistant_msg = choice.message
 
-            full_messages.append(assistant_msg.model_dump(exclude_none=True))
+            full_messages.append(cast(ChatCompletionMessageParam, assistant_msg.model_dump(exclude_none=True)))
 
             if not assistant_msg.tool_calls:
                 log.info(f"[{trace}] LLM finished, tools_called={tool_calls_made}")
@@ -89,15 +104,16 @@ class LLMService:
                     log.error(f"[{trace}] Tool error: {e}")
                     result = {"error": str(e)}
 
-                full_messages.append({
+                tool_msg: ChatCompletionToolMessageParam = {
                     "role": "tool",
                     "tool_call_id": tc.id,
                     "content": json.dumps(result, ensure_ascii=False),
-                })
+                }
+                full_messages.append(tool_msg)
 
         return "Maximale Schrittanzahl erreicht.", tool_calls_made
 
-    async def extract_tasks_from_text(self, text: str) -> list[dict[str, Any]]:
+    async def extract_tasks_from_text(self, text: str) -> list[dict[str, object]]:
         """
         Perception-Schicht: Extrahiert strukturierte Aufgaben aus Freitext (PDF/OCR).
         Verwendet Structured Output via JSON Schema.
@@ -120,10 +136,11 @@ TEXT:
 
 JSON:"""
 
+        user_msg: ChatCompletionUserMessageParam = {"role": "user", "content": prompt}
         response = await self.client.chat.completions.create(
             model=self.model,
             temperature=0.1,
-            messages=[{"role": "user", "content": prompt}],
+            messages=[user_msg],
             response_format={"type": "json_object"},
         )
 

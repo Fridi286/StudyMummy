@@ -1,30 +1,30 @@
 """
 Memory-Modelle (Working, Episodic, Semantic) aus Übungsblatt 02.
 """
-from datetime import datetime
-from typing import Any, Optional
-from pydantic import BaseModel, Field
+from datetime import datetime, timezone
+from typing import ClassVar
+
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class DialogTurn(BaseModel):
     role: str  # "user" | "assistant"
     content: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class WorkingMemory(BaseModel):
     """Kurzzeitgedächtnis: aktive Aufgabe + aktueller Dialog."""
     session_id: str
-    current_task_id: Optional[str] = None
+    current_task_id: str | None = None
     help_level: int = Field(default=1, ge=1, le=3)
     dialog_history: list[DialogTurn] = []
     intermediate_steps: list[str] = []
 
-    class Config:
-        from_attributes = True
+    model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)
 
 
-from typing import Optional
+
 
 
 class EpisodicEvent(BaseModel):
@@ -32,8 +32,8 @@ class EpisodicEvent(BaseModel):
     session_id: str
     task_id: str
     event_type: str  # "solved", "error", "hint_given", "quiz_result"
-    payload: dict[str, Any] = {}
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    payload: dict[str, object] = {}
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class LearningProfile(BaseModel):
@@ -42,4 +42,4 @@ class LearningProfile(BaseModel):
     confidence_scores: dict[str, float] = {}   # topic → 0.0–1.0
     error_patterns: list[str] = []
     sessions_count: int = 0
-    last_seen: Optional[datetime] = None
+    last_seen: datetime | None = None

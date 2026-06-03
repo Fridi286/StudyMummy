@@ -6,16 +6,15 @@ import logging
 import sys
 import uuid
 from contextvars import ContextVar
-from typing import Optional
 
-trace_id_var: ContextVar[Optional[str]] = ContextVar("trace_id", default=None)
+trace_id_var: ContextVar[str | None] = ContextVar("trace_id", default=None)
 
 
 def get_trace_id() -> str:
     tid = trace_id_var.get()
     if tid is None:
         tid = str(uuid.uuid4())[:8]
-        trace_id_var.set(tid)
+        _ = trace_id_var.set(tid)
     return tid
 
 
@@ -27,7 +26,7 @@ def setup_logging(level: str = "INFO") -> None:
     )
 
 
-class TraceAdapter(logging.LoggerAdapter):
+class TraceAdapter(logging.LoggerAdapter[logging.Logger]):
     def process(self, msg, kwargs):
         kwargs.setdefault("extra", {})["trace_id"] = get_trace_id()
         return msg, kwargs
