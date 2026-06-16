@@ -22,7 +22,7 @@ services:
       retries: 5
 
   web:
-    build: .
+    build: code
     container_name: studymummy_web
     restart: always
     ports:
