@@ -757,12 +757,12 @@ Wenn StudyMummy den ReAct-Loop mit Tool Use und Tracing nutzt, dann steigt die s
 
 ### Versuchsaufbau
 
-Zwei Varianten wurden mit je drei deterministischen, gemockten Läufen verglichen:
+Zwei Varianten wurden mit je drei reproduzierbaren Offline-Läufen verglichen. Die Baseline ist bewusst eine einfache Vergleichsfolie ohne StudyMummy-Orchestrierung. Die ReAct-Variante läuft dagegen durch den echten `LLMService.chat_with_tools`-Pfad: Nur die OpenAI-Modellantwort wird gemockt, damit das Experiment ohne API-Key stabil reproduzierbar bleibt. Tool Dispatch, Ausführung von `evaluate_answer`, Tool-Observation, Trace-ID und finale Bewertung nutzen den StudyMummy-Code.
 
 | Variante | Beschreibung |
 |---|---|
-| `baseline_without_tools` | Antwort ohne Tool Calls, ohne gültige Trace-ID, teilweise direkte Lösung. |
-| `react_with_tools_and_tracing` | Antwort mit `evaluate_answer`, gültiger Trace-ID und sokratischer Rückfrage. |
+| `baseline_without_tools` | Simulierte Direktantwort ohne StudyMummy-ReAct-Loop, ohne Tool Calls, ohne gültige Trace-ID. |
+| `react_with_tools_and_tracing` | Echter StudyMummy-ReAct-Servicepfad mit gemockter OpenAI-Antwort, realem `evaluate_answer`-Tool, gültiger Trace-ID und sokratischer Rückfrage. |
 
 Das Experiment ist reproduzierbar:
 
@@ -777,7 +777,7 @@ uv run --extra dev python scripts/run_semantic_experiment.py
 | `baseline_without_tools` | 3 | 0.27 | 0.00 | `needs_attention` |
 | `react_with_tools_and_tracing` | 3 | 1.00 | 1.00 | `socratic_stable` |
 
-**Interpretation:** Die robuste ReAct-Variante erfüllt in diesem kontrollierten Experiment alle definierten Proxy-Kriterien. Die Baseline scheitert vor allem an fehlendem Tool Use, fehlendem Trace und dem Risiko, direkt Lösungen auszugeben.
+**Interpretation:** Die robuste ReAct-Variante erfüllt in diesem kontrollierten Experiment alle definierten Proxy-Kriterien. Die Baseline scheitert vor allem an fehlendem Tool Use, fehlendem Trace und dem Risiko, direkt Lösungen auszugeben. Wichtig: Das Experiment misst nicht die freie Qualität eines Live-OpenAI-Modells, sondern prüft kontrolliert, ob unser StudyMummy-Orchestrierungsdesign die gewünschten Eigenschaften erzwingt.
 
 ---
 
