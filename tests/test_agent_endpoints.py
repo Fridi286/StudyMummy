@@ -60,6 +60,16 @@ def test_document_upload_text_file():
     assert len(data["extracted_tasks"]) == 1
 
 
+def test_document_upload_empty_file_rejected():
+    r = client.post(
+        "/api/v1/agent/upload",
+        files={"file": ("empty.txt", b"", "text/plain")},
+    )
+
+    assert r.status_code == 400
+    assert "Leere Datei" in r.json()["detail"]
+
+
 def test_chat_endpoint_mocked():
     """Testet den Chat-Endpunkt mit gemocktem LLM."""
     with patch(

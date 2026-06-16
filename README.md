@@ -664,6 +664,173 @@ StudyMummy bleibt bewusst ein Single-Agent-System mit vertiefter Tool-/RAG-Integ
 
 ---
 
+# Übungsblatt 05 - Engineering: Robustheit, Testing & Observability
+
+
+## Meilenstein 1 - Fehlerbehandlung
+
+### Identifizierte Failure Modes
+
+| Failure Mode | Risiko | Implementierte Reaktion | Teststatus |
+|---|---|---|---|
+| Leere Chatnachricht | Unnötiger LLM-Call, unklare Antwort oder Halluzination | `ChatRequest` trimmt Eingaben und verlangt mindestens ein Zeichen. | Validierung über Pydantic-Modell |
+| Leerer Upload | Agent könnte Aufgaben aus leerem Inhalt erfinden | Upload-Endpunkt gibt HTTP 400 zurück. | `test_document_upload_empty_file_rejected` |
+| LLM/API-Ausfall | Chat bricht mit Exception ab | `LLMService.chat_with_tools` gibt eine verständliche Fallback-Antwort zurück. | `test_chat_with_tools_returns_fallback_on_api_error` |
+| Ungültige Tool-Argumente | ReAct-Loop bricht bei `json.loads` ab | Fehler wird als Tool-Observation zurück in den Loop gegeben. | `test_chat_with_tools_handles_invalid_tool_arguments_semantically` |
+| Ungültige Structured-Output-Antwort | Upload-/Task-Extraktion bricht ab | Task-Extraktion gibt eine leere Liste zurück und loggt den Fehler. | `test_extract_tasks_from_text_returns_empty_list_on_invalid_json` |
+| Fehlende DB-Runtime-Dependency | Tests/API scheitern beim Schließen einer AsyncSession | `greenlet>=3.0.0` wurde als Dependency ergänzt. | Gesamttestlauf: 22 passed |
+
+### Iteration nach erstem Testlauf
+
+Der erste vollständige Testlauf zeigte drei Fehler in den Endpoint-Tests. Ursache war nicht die Business-Logik, sondern eine fehlende Runtime-Dependency für SQLAlchemy Async:
+
+```text
+ValueError: the greenlet library is required to use this function. No module named 'greenlet'
+```
+
+**Änderung:** `greenlet>=3.0.0` wurde in `pyproject.toml` ergänzt. Danach lief die Testsuite vollständig grün.
+
+---
+
+## Meilenstein 2 - Testing
+
+### Semantische Tests
+
+Die Tests vermeiden exakte Stringvergleiche, wo LLM-Verhalten variieren kann. Stattdessen prüfen sie Verhalten und Eigenschaften:
+
+| Testdatei | Semantische Assertion |
+|---|---|
+| `tests/test_tools.py` | Bewertungs-Tool erkennt Konzepttreffer, Scores werden sinnvoll begrenzt, Quizfragen enthalten Optionen und korrekte Antwort. |
+| `tests/test_agent_endpoints.py` | Chatantwort ist nicht leer, Trace-ID ist vorhanden, leerer Upload wird kontrolliert abgelehnt. |
+| `tests/test_llm_robustness.py` | API-Ausfall führt zu Fallback, ungültige Tool-Argumente zerstören den ReAct-Loop nicht, ungültiges JSON erzeugt keine Exception. |
+| `tests/test_evaluation_metrics.py` | Sokratische Antwortform, Tool Coverage, Trace-ID-Qualität und Direktlösungsrisiko werden semantisch bewertet. |
+
+Aktueller Teststand:
+
+```text
+uv run --extra dev pytest tests -q
+22 passed in 0.08s
+```
+
+### Schwer testbare Aspekte
+
+| Aspekt | Warum schwer testbar? | Umgang im Projekt |
+|---|---|---|
+| Qualität sokratischer Hinweise | Gute Tutorantworten sind teilweise subjektiv. | Semantische Marker wie Frageform, keine Direktlösung, lernfördernde Sprache. |
+| LLM-Varianz | Gleiche Eingabe kann verschiedene Antworten erzeugen. | Tool Calls, Trace-Form und Antwortstruktur statt exakter Wortlaut. |
+| Echte Lernverbesserung | Benötigt echte Nutzer über mehrere Sessions. | Für MVP nur Proxy-Metriken: Confidence-Update, Fehlerhäufigkeit, Quiz-Performance. |
+| RAG-Qualität | Aktuell ist Retrieval noch ein Mock. | Metrik vorbereitet, echte Similarity-Suche bleibt Ausbaupunkt. |
+
+---
+
+## Metriken
+
+### Quantitative Metrik
+
+**Semantic Reliability Score (0.0 bis 1.0)** aus `app/evaluation/metrics.py`.
+
+Der Score mittelt fünf beobachtbare Kriterien:
+
+1. Antwort ist nicht leer.
+2. Trace-ID ist im erwarteten Format vorhanden.
+3. Antwort fragt oder führt sokratisch weiter.
+4. Antwort vermeidet direkte Komplettlösung.
+5. Erwartete Tools wurden aufgerufen (`tool_coverage`).
+
+### Qualitative Metrik
+
+**Qualitative Labels**:
+
+| Label | Bedeutung |
+|---|---|
+| `socratic_stable` | Antwort ist nachvollziehbar, sokratisch, getraced und nutzt erwartete Tools. |
+| `usable_with_minor_gaps` | Antwort ist grundsätzlich nutzbar, aber nicht vollständig ideal. |
+| `needs_attention` | Antwort oder Trace verletzt zentrale Erwartungen. |
+
+---
+
+## Hypothese und Experiment
+
+### Hypothese
+
+Wenn StudyMummy den ReAct-Loop mit Tool Use und Tracing nutzt, dann steigt die semantische Zuverlässigkeit gegenüber einer Baseline ohne Tools und ohne Trace, weil Antworten besser beobachtbar sind und erwartete Aktionen explizit überprüft werden können.
+
+### Versuchsaufbau
+
+Zwei Varianten wurden mit je drei deterministischen, gemockten Läufen verglichen:
+
+| Variante | Beschreibung |
+|---|---|
+| `baseline_without_tools` | Antwort ohne Tool Calls, ohne gültige Trace-ID, teilweise direkte Lösung. |
+| `react_with_tools_and_tracing` | Antwort mit `evaluate_answer`, gültiger Trace-ID und sokratischer Rückfrage. |
+
+Das Experiment ist reproduzierbar:
+
+```bash
+uv run --extra dev python scripts/run_semantic_experiment.py
+```
+
+### Ergebnisse
+
+| Variante | Läufe | Durchschnittlicher Score | Tool Coverage | Qualitatives Ergebnis |
+|---|---:|---:|---:|---|
+| `baseline_without_tools` | 3 | 0.27 | 0.00 | `needs_attention` |
+| `react_with_tools_and_tracing` | 3 | 1.00 | 1.00 | `socratic_stable` |
+
+**Interpretation:** Die robuste ReAct-Variante erfüllt in diesem kontrollierten Experiment alle definierten Proxy-Kriterien. Die Baseline scheitert vor allem an fehlendem Tool Use, fehlendem Trace und dem Risiko, direkt Lösungen auszugeben.
+
+---
+
+## Trace-Vergleich
+
+Zwei Läufe mit gleicher Eingabe wurden über `compare_trace_runs` verglichen.
+
+```text
+Trace comparison: {
+  'run_count': 2,
+  'same_input': True,
+  'unique_trace_ids': 2,
+  'same_tool_sequence': True,
+  'response_shape_stable': True
+}
+```
+
+**Bewertung:** Unterschiedliche Trace-IDs sind erwünscht, weil jeder Durchlauf eindeutig nachvollziehbar sein soll. Die Tool-Sequenz und Antwortform bleiben stabil; das ist für den MVP wichtiger als identischer Wortlaut.
+
+---
+
+## Aktualisiertes Architekturdiagramm mit Fehlerbehandlung und Tracing
+
+```mermaid
+flowchart TD
+    U["User / Frontend"] --> M["LoggingMiddleware<br/>setzt trace_id"]
+    M --> A["FastAPI Agent Endpoints"]
+    A --> V["Request Validation<br/>Pydantic + HTTP 400"]
+    V --> S["Session / Memory Service"]
+    V --> R["RAG Service<br/>Kontextsuche"]
+    S --> L["LLMService<br/>Prompt + ReAct Loop"]
+    R --> L
+    L --> T["Tool Registry"]
+    T --> ST["Study Tools<br/>evaluate, quiz, profile, coins"]
+    ST --> L
+    L --> F["Fallback Handling<br/>API-Fehler, JSON-Fehler, max. Schritte"]
+    F --> A
+    A --> O["Response<br/>message + tool_calls + trace_id"]
+    M -. "Request/Response Logs" .-> LOG["Structured Logs"]
+    L -. "Prompt Preview, Response Preview, Latenz" .-> LOG
+    T -. "Tool Calls + Observations" .-> LOG
+```
+
+---
+
+## Reflexion
+
+Termin 5 zeigt, dass bei Agentic AI nicht nur die Antwortqualität zählt, sondern auch die technische Beobachtbarkeit. Ohne Trace-ID, Tool-Call-Protokoll und semantische Tests wäre kaum unterscheidbar, ob StudyMummy wirklich geplant handelt oder nur plausibel klingende Texte erzeugt.
+
+Gelernt wurde außerdem: Nicht alle Qualitätsmerkmale sind mit klassischen Unit-Tests abdeckbar. Für den Tutor-Agenten sind Proxy-Metriken nötig, z. B. ob die Antwort sokratisch bleibt, ob erwartete Tools genutzt werden und ob Fehler kontrolliert abgefangen werden. Die aktuelle Evaluation ist noch kein Beweis für echten Lernerfolg, aber sie macht den MVP deutlich belastbarer und bereitet Termin 6 vor: Guardrails, Safety und bessere Output-Kontrolle.
+
+---
+
 ## Projektstruktur
 
 ```
@@ -675,6 +842,8 @@ studymummy/
 │   ├── core/
 │   │   ├── config.py                ← Pydantic Settings
 │   │   └── logging.py               ← trace_id-Logging (Observability)
+│   ├── evaluation/
+│   │   └── metrics.py               ← Semantische Metriken + Trace-Vergleich
 │   ├── api/v1/
 │   │   ├── router.py                ← Zentraler v1-Router
 │   │   └── endpoints/
@@ -697,7 +866,11 @@ studymummy/
 └── tests/
     ├── test_tasks.py                ← CRUD-Tests (deterministisch)
     ├── test_tools.py                ← Tool-Tests (semantische Assertions)
-    └── test_agent_endpoints.py      ← Integrationstests (LLM gemockt)
+    ├── test_agent_endpoints.py      ← Integrationstests (LLM gemockt)
+    ├── test_llm_robustness.py       ← Fehlerbehandlung ohne Live-LLM
+    └── test_evaluation_metrics.py   ← Semantische Evaluationsmetriken
+scripts/
+└── run_semantic_experiment.py       ← Reproduzierbares Termin-5-Experiment
 ```
 
 ---
@@ -707,9 +880,10 @@ studymummy/
 Jeder eingehende Request erhält eine zufällige `trace_id` (8-stellig hex). Diese wird durch alle Service-Aufrufe weitergereicht und in jedem Log-Eintrag angezeigt:
 
 ```
-2026-05-19 13:20:01 [INFO] trace=a3f9b1c2 llm_service: LLM call started, messages=3
-2026-05-19 13:20:01 [INFO] trace=a3f9b1c2 llm_service: Tool call: evaluate_answer(...)
-2026-05-19 13:20:02 [INFO] trace=a3f9b1c2 llm_service: LLM finished, tools_called=['evaluate_answer']
+2026-06-16 13:20:01 [INFO] trace=a3f9b1c2 llm_service: LLM call started, messages=3, extra_context=True, input_preview='Ich verstehe die Nullstelle nicht.'
+2026-06-16 13:20:01 [INFO] trace=a3f9b1c2 llm_service: LLM response received in 842.4ms, tool_calls=1, response_preview='...'
+2026-06-16 13:20:01 [INFO] trace=a3f9b1c2 llm_service: Tool call: evaluate_answer(...)
+2026-06-16 13:20:02 [INFO] trace=a3f9b1c2 llm_service: LLM finished after 1320.7ms, tools_called=['evaluate_answer']
 2026-05-19 13:20:02 [INFO] trace=a3f9b1c2 logging_middleware: POST /api/v1/agent/chat → 200 (1243.5ms)
 ```
 
@@ -717,15 +891,15 @@ Die `trace_id` wird auch im Response-Header `X-Trace-Id` und im JSON-Body zurüc
 
 ---
 
-## Nächste Schritte (Übungsblatt 05+)
+## Nächste Schritte (Übungsblatt 06+)
 
 | Aufgabe | Priorität | Ziel-Termin |
 |---|---|---|
-| ChromaDB-Anbindung für echtes Embedding-Retrieval | Hoch | Übungsblatt 05 |
-| PyMuPDF für PDF-Upload | Hoch | Übungsblatt 05 |
-| PostgreSQL / Supabase für persistente Sessions | Mittel | Übungsblatt 05 |
+| ChromaDB-Anbindung für echtes Embedding-Retrieval | Mittel | Ausbau nach MVP |
+| PyMuPDF für PDF-Upload | Hoch | Übungsblatt 06 |
+| PostgreSQL / Supabase für persistente Sessions | Mittel | Übungsblatt 06 |
 | Multi-Agent: Orchestrator + Worker | Niedrig | Spätere Skalierungsoption |
-| Semantische Tests für LLM-Antworten | Hoch | Übungsblatt 05 |
+| Semantische Tests erweitern | Mittel | Laufend |
 | Guardrails gegen Prompt Injection | Hoch | Übungsblatt 06 |
 
 ---

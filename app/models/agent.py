@@ -1,14 +1,14 @@
 """
 Request/Response-Modelle für alle Agent-Endpunkte.
 """
-from typing import Optional, Any
-from pydantic import BaseModel
+from typing import Annotated, Optional, Any
+from pydantic import BaseModel, StringConstraints
 
 
 class ChatRequest(BaseModel):
-    session_id: str
-    user_id: str
-    message: str
+    session_id: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+    user_id: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+    message: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
     task_id: Optional[str] = None
 
 
