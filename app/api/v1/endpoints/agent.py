@@ -75,11 +75,15 @@ async def upload_document(
         raise HTTPException(status_code=400, detail="Kein Dateiname")
 
     content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="Leere Datei hochgeladen")
     
     try:
         text = content.decode("utf-8")
     except UnicodeDecodeError:
         text = content.decode("latin-1", errors="replace")
+    if not text.strip():
+        raise HTTPException(status_code=400, detail="Datei enthält keinen auswertbaren Text")
 
     doc_id = file.filename.replace(" ", "_")
     rag.add_document(doc_id=doc_id, text=text, metadata={"filename": file.filename})

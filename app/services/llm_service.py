@@ -3,6 +3,7 @@ LLM-Service: kapselt alle OpenAI-Calls mit Tool Use (Function Calling).
 Zentrale Stelle für alle LLM-Interaktionen – leicht gegen ein anderes LLM austauschbar.
 """
 import json
+import time
 from typing import Any, Optional
 from openai import AsyncOpenAI
 from app.core.config import get_settings
@@ -41,7 +42,11 @@ class LLMService:
         Gibt (final_message, tool_calls_made) zurück.
         """
         trace = get_trace_id()
-        log.info(f"[{trace}] LLM call started, messages={len(messages)}")
+        started_at = time.perf_counter()
+        log.info(
+            f"[{trace}] LLM call started, messages={len(messages)}, "
+            f"extra_context={bool(extra_context)}"
+        )
 
         full_messages = [{"role": "system", "content": system_prompt}]
         if extra_context:
@@ -56,28 +61,59 @@ class LLMService:
 
         # ReAct-Loop: Thought → Action → Observation
         for _ in range(5):  # max 5 Iterationen als Guardrail
-            response = await self.client.chat.completions.create(
-                model=self.model,
-                temperature=self.temperature,
-                messages=full_messages,
-                tools=tools if tools else None,
-                tool_choice="auto" if tools else None,
-            )
+            call_started_at = time.perf_counter()
+            try:
+                response = await self.client.chat.completions.create(
+                    model=self.model,
+                    temperature=self.temperature,
+                    messages=full_messages,
+                    tools=tools if tools else None,
+                    tool_choice="auto" if tools else None,
+                )
+            except Exception as e:
+                duration_ms = round((time.perf_counter() - started_at) * 1000, 1)
+                log.error(f"[{trace}] LLM API error after {duration_ms}ms: {e}")
+                return (
+                    "Ich kann gerade keine zuverlässige KI-Antwort erzeugen. "
+                    "Bitte versuche es gleich noch einmal oder formuliere die Frage etwas kürzer.",
+                    tool_calls_made,
+                )
 
             choice = response.choices[0]
             assistant_msg = choice.message
+            call_duration_ms = round((time.perf_counter() - call_started_at) * 1000, 1)
+            response_preview = (assistant_msg.content or "")[:160].replace("\n", " ")
+            log.info(
+                f"[{trace}] LLM response received in {call_duration_ms}ms, "
+                f"tool_calls={len(assistant_msg.tool_calls or [])}, "
+                f"response_preview={response_preview!r}"
+            )
 
             full_messages.append(assistant_msg.model_dump(exclude_none=True))
 
             if not assistant_msg.tool_calls:
-                log.info(f"[{trace}] LLM finished, tools_called={tool_calls_made}")
+                duration_ms = round((time.perf_counter() - started_at) * 1000, 1)
+                log.info(
+                    f"[{trace}] LLM finished after {duration_ms}ms, "
+                    f"tools_called={tool_calls_made}"
+                )
                 return assistant_msg.content or "", tool_calls_made
 
             # Tool-Calls ausführen (Observation)
             for tc in assistant_msg.tool_calls:
                 fn_name = tc.function.name
-                fn_args = json.loads(tc.function.arguments)
                 tool_calls_made.append(fn_name)
+                try:
+                    fn_args = json.loads(tc.function.arguments or "{}")
+                except json.JSONDecodeError as e:
+                    result = {"error": f"Invalid tool arguments: {e.msg}"}
+                    log.error(f"[{trace}] Tool argument JSON error for {fn_name}: {e}")
+                    full_messages.append({
+                        "role": "tool",
+                        "tool_call_id": tc.id,
+                        "content": json.dumps(result, ensure_ascii=False),
+                    })
+                    continue
                 log.info(f"[{trace}] Tool call: {fn_name}({fn_args})")
 
                 try:
@@ -95,6 +131,8 @@ class LLMService:
                     "content": json.dumps(result, ensure_ascii=False),
                 })
 
+        duration_ms = round((time.perf_counter() - started_at) * 1000, 1)
+        log.warning(f"[{trace}] LLM max steps reached after {duration_ms}ms")
         return "Maximale Schrittanzahl erreicht.", tool_calls_made
 
     async def extract_tasks_from_text(self, text: str) -> list[dict[str, Any]]:
@@ -103,6 +141,7 @@ class LLMService:
         Verwendet Structured Output via JSON Schema.
         """
         trace = get_trace_id()
+        started_at = time.perf_counter()
         log.info(f"[{trace}] Task extraction started")
 
         prompt = f"""Analysiere den folgenden Text und extrahiere alle Lernaufgaben.
@@ -120,17 +159,27 @@ TEXT:
 
 JSON:"""
 
-        response = await self.client.chat.completions.create(
-            model=self.model,
-            temperature=0.1,
-            messages=[{"role": "user", "content": prompt}],
-            response_format={"type": "json_object"},
-        )
+        try:
+            response = await self.client.chat.completions.create(
+                model=self.model,
+                temperature=0.1,
+                messages=[{"role": "user", "content": prompt}],
+                response_format={"type": "json_object"},
+            )
+        except Exception as e:
+            duration_ms = round((time.perf_counter() - started_at) * 1000, 1)
+            log.error(f"[{trace}] Task extraction API error after {duration_ms}ms: {e}")
+            return []
 
         content = response.choices[0].message.content or "{}"
-        parsed = json.loads(content)
+        try:
+            parsed = json.loads(content)
+        except json.JSONDecodeError as e:
+            log.error(f"[{trace}] Task extraction JSON error: {e}")
+            return []
         tasks = parsed.get("tasks", parsed) if isinstance(parsed, dict) else parsed
         if not isinstance(tasks, list):
             tasks = []
-        log.info(f"[{trace}] Extracted {len(tasks)} tasks")
+        duration_ms = round((time.perf_counter() - started_at) * 1000, 1)
+        log.info(f"[{trace}] Extracted {len(tasks)} tasks after {duration_ms}ms")
         return tasks

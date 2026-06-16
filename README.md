@@ -51,7 +51,7 @@ StudyMummy besitzt Merkmale mehrerer Agententypen:
 | **Utility-Based Agent** | Der Agent kann zwischen verschiedenen nächsten Aktionen abwägen, z. B. weiterer Hinweis, neue Aufgabe, Wiederholung oder Spielmodus. |
 | **Learning Agent** | Der Agent aktualisiert das Lernprofil anhand von Nutzerantworten und passt zukünftige Hilfen, Wiederholungen, Spiele und Cheatsheets daran an. |
 
-**Begründung:**  
+**Begründung:**
 StudyMummy ist ein Learning Agent, weil das System nicht nur einzelne Antworten erzeugt, sondern aus Nutzerinteraktionen ein Lernprofil ableitet. Dieses Profil beeinflusst spätere Entscheidungen, zum Beispiel welches Hilfeniveau gewählt wird, welche Themen wiederholt werden sollen, welche Quizfragen generiert werden und welche Inhalte im Cheatsheet besonders hervorgehoben werden.
 
 ---
@@ -529,7 +529,138 @@ curl http://localhost:8000/api/v1/memory/profile/student_42
 | RAG-Retrieval | ⚠️ Mock | Kein echtes Embedding, nur sequentielle Ausgabe |
 | Lernprofil-Persistenz | ⚠️ In-Memory | Geht beim Neustart verloren |
 | PDF-Parsing (PyMuPDF) | ❌ Nicht implementiert | Dependency vorbereitet in `pyproject.toml` |
-| Echte Similarity-Suche | ❌ Nicht implementiert | ChromaDB-Anbindung für Übungsblatt 04 |
+| Echte Similarity-Suche | ❌ Nicht implementiert | ChromaDB-Anbindung als nächster Ausbau |
+
+---
+
+# Übungsblatt 04 - Architektur skalieren: Multi-Agent oder Vertiefung
+
+
+## Meilenstein 1 - Architekturentscheidung
+
+### Entscheidung: Pfad B - Vertiefung statt Multi-Agent
+
+StudyMummy bleibt im aktuellen MVP ein **orchestrierter Single-Agent mit Tool Use, RAG-Kontext und ReAct-Loop**. Wir entscheiden uns bewusst gegen eine sofortige Multi-Agent-Architektur, weil der wichtigste Nutzerfluss - eine Lernaufgabe verstehen, Schritt für Schritt begleiten, Antwort bewerten und Lernprofil aktualisieren - stark sequenziell ist.
+
+Ein Multi-Agent-System wäre fachlich möglich, z. B. mit Upload Analyzer, Tutor Agent, Evaluation Agent, Progress Agent und Quiz Agent. Für den aktuellen Stand würde diese Aufteilung aber mehr Koordinationsaufwand erzeugen als Nutzen bringen. Die zentrale Herausforderung liegt nicht im parallelen Durchsatz, sondern in Robustheit, nachvollziehbaren Entscheidungen und sauberem Umgang mit fehlerhaften Eingaben.
+
+### Heuristik aus der Vorlesung
+
+| Frage | Bewertung für StudyMummy | Konsequenz |
+|---|---|---|
+| Gibt es unabhängige Teilaufgaben? | Teilweise. Upload-Analyse, Bewertung, Quiz und Cheatsheet lassen sich fachlich trennen. | Perspektivisch ja, aber für das MVP reicht ein zentraler Agent mit klaren Tools. |
+| Profitieren die Teilaufgaben von Spezialisierung? | Ja, besonders bei Perception, Evaluation und Lernprofil. | Spezialisierte Worker bleiben eine sinnvolle Ausbaustufe. |
+| Erhöht Parallelisierung den Durchsatz? | Nur begrenzt. Der Tutor-Dialog ist schrittweise und abhängig vom aktuellen Nutzerzustand. | Parallelisierung ist aktuell weniger wichtig als korrekte Sequenz und Kontexttreue. |
+| Ist Shared State beherrschbar? | Noch nicht vollständig. Sessions, Profile und RAG laufen im MVP nur in-memory. | Erst Persistenz und Tracing stabilisieren, dann Multi-Agent-Koordination. |
+| Ist die Fehleranalyse im Single-Agent-Modus noch nachvollziehbar? | Ja. Tool Calls, `trace_id` und ReAct-Schritte sind zentral sichtbar. | Single-Agent erleichtert Debugging und Evaluation im aktuellen Stadium. |
+
+**Begründung:**
+StudyMummy soll Lernende nicht einfach mit vielen parallel arbeitenden Agenten beeindrucken, sondern zuverlässig tutorieren. Der sinnvollste nächste Schritt ist deshalb die Vertiefung der vorhandenen Architektur: RAG-Kontext, Tool Use, ReAct-Loop, Observability und Fehlerbehandlung werden so dokumentiert und ausgebaut, dass das System ungewöhnliche Eingaben besser überlebt.
+
+---
+
+## Meilenstein 2 - Vertiefte Implementierung
+
+### Geschlossene zweite Lücke: RAG + Tool Use im selben Agentenfluss
+
+Der Agent kombiniert jetzt **RAG-Kontext** mit **Tool Use** in einem gemeinsamen Chat-Ablauf.
+
+Der Ablauf ist:
+
+1. Nutzer sendet eine Chatnachricht an `/api/v1/agent/chat`.
+2. Das Working Memory wird über `session_id` geladen.
+3. Der RAG-Service sucht passenden Kontext zur Nachricht.
+4. Der LLM-Service baut System Prompt, optionalen RAG-Kontext und Dialoghistorie zusammen.
+5. Der ReAct-Loop entscheidet, ob Tools aufgerufen werden.
+6. Tool-Ergebnisse werden als Observation zurück in den LLM-Kontext gegeben.
+7. Die finale Tutorantwort wird gespeichert und mit `trace_id` zurückgegeben.
+
+### ReAct-Pattern
+
+Das ReAct-Pattern ist im `LLMService` umgesetzt:
+
+| ReAct-Schritt | Umsetzung im Projekt |
+|---|---|
+| Thought | Das LLM bewertet die aktuelle Nachricht im Kontext des sokratischen System Prompts. |
+| Action | Das LLM kann registrierte Tools wie `evaluate_answer`, `update_learning_profile`, `generate_quiz_questions`, `create_cheatsheet` oder `award_coins` aufrufen. |
+| Observation | Tool-Ergebnisse werden als `tool`-Message zurück in den Chat-Kontext eingefügt. |
+| Guardrail | Maximal 5 Iterationen verhindern Endlosschleifen. |
+
+### Neues Feature: Robustheits- und Observability-Vertiefung
+
+Für Termin 4 wurde nicht ein komplett neuer Agent eingeführt, sondern die vorhandene Agentenarchitektur robuster gemacht:
+
+- LLM-Aufrufe loggen Start, Response-Vorschau, Tool-Call-Anzahl und Latenz.
+- API-Ausfälle des LLM führen zu einer verständlichen Fallback-Antwort statt zu einem ungefangenen Fehler.
+- Ungültige Tool-Argumente werden abgefangen und als strukturierte Observation an den ReAct-Loop zurückgegeben.
+- Task-Extraktion gibt bei API- oder JSON-Fehlern eine leere Aufgabenliste zurück statt den Upload-Flow hart abbrechen zu lassen.
+- Leere Upload-Dateien und Dateien ohne auswertbaren Text werden mit HTTP 400 abgefangen.
+
+---
+
+## Observability-Setup
+
+StudyMummy nutzt eine requestweite `trace_id`, um Chatdurchläufe nachvollziehbar zu machen. Diese ID wird in Logs, Response-Headern und Chat-Responses sichtbar.
+
+| Observability-Aspekt | Umsetzung |
+|---|---|
+| Request-Tracing | `LoggingMiddleware` setzt pro Request eine neue `trace_id`. |
+| LLM-Start | Loggt Modellaufruf, Nachrichtenanzahl und ob RAG-Kontext vorhanden ist. |
+| LLM-Response | Loggt Latenz, Anzahl der Tool Calls und eine kurze Response-Vorschau. |
+| Tool Calls | Jeder Tool-Aufruf wird mit Funktionsname und Argumenten geloggt. |
+| Fehler | API-Fehler, Tool-Fehler und JSON-Parsing-Fehler werden mit derselben `trace_id` geloggt. |
+| Frontend-Korrelation | `X-Trace-Id` im Response-Header verbindet Frontend- und Backend-Beobachtungen. |
+
+Beispielhafter Trace:
+
+```text
+2026-06-02 14:10:01 [INFO] trace=a3f9b1c2 app.services.llm_service: [a3f9b1c2] LLM call started, messages=3, extra_context=True
+2026-06-02 14:10:02 [INFO] trace=a3f9b1c2 app.services.llm_service: [a3f9b1c2] LLM response received in 842.4ms, tool_calls=1, response_preview='...'
+2026-06-02 14:10:02 [INFO] trace=a3f9b1c2 app.services.llm_service: [a3f9b1c2] Tool call: evaluate_answer(...)
+2026-06-02 14:10:03 [INFO] trace=a3f9b1c2 app.services.llm_service: [a3f9b1c2] LLM finished after 1320.7ms, tools_called=['evaluate_answer']
+```
+
+---
+
+## Edge Cases und Failure Modes
+
+| Failure Mode | Erwartetes Verhalten | Tatsächliches Verhalten im aktuellen Stand | Lösungsansatz |
+|---|---|---|---|
+| Leere Chatnachricht | Agent soll nicht halluzinieren, sondern nach einer konkreten Frage oder Aufgabe fragen. | Noch nicht vollständig validiert; leere Strings können an das LLM weitergegeben werden. | Für Termin 5: Validierung in `ChatRequest` ergänzen, z. B. Mindestlänge und Trim-Prüfung. |
+| Leerer Upload | Upload soll abgelehnt werden. | Implementiert: leere Datei ergibt HTTP 400. | `agent.upload_document` prüft `content` vor Decoding. |
+| Upload ohne auswertbaren Text | Agent soll keine erfundenen Aufgaben extrahieren. | Implementiert: Whitespace-only-Dateien ergeben HTTP 400. | Text wird nach Decoding mit `text.strip()` geprüft. |
+| LLM/API-Ausfall | Nutzer soll eine verständliche Fallback-Antwort erhalten; Logs sollen den Fehler enthalten. | Implementiert im Chat- und Task-Extraktionspfad. | `LLMService` fängt API-Fehler ab, loggt Latenz und Fehler, gibt Fallback zurück. |
+| Ungültiges JSON bei Task-Extraktion | Keine Exception bis zum Nutzer durchreichen. | Implementiert: ungültiges JSON ergibt leere Aufgabenliste. | JSON-Parsing wird abgefangen und mit `trace_id` geloggt. |
+| Ungültige Tool-Argumente | ReAct-Loop soll nicht abbrechen. | Implementiert: Fehler wird als Tool-Observation zurückgegeben. | `json.JSONDecodeError` bei Tool-Arguments wird abgefangen. |
+| Unbekanntes Tool | Agent soll keine Anwendungsexception erzeugen. | Implementiert: Registry-Fehler wird als `{"error": ...}` zurückgegeben. | `KeyError` beim Tool Lookup wird abgefangen. |
+| ReAct-Endlosschleife | Agent soll begrenzt abbrechen. | Implementiert: maximal 5 Iterationen. | Guardrail im `LLMService`. |
+| Kein RAG-Kontext vorhanden | Chat soll trotzdem funktionieren. | Implementiert: leerer Kontext wird nicht als zusätzliche System Message gesendet. | `extra_context=context or None`. |
+
+### Priorisierte Robustheitslücken
+
+| Priorität | Lücke | Warum wichtig? |
+|---|---|---|
+| Hoch | Validierung leerer Chatnachrichten | Verhindert unnötige LLM-Kosten und unklare Antworten. |
+| Hoch | Echtes PDF-Parsing statt Text-Decoding | Uploads sind ein Kernfeature; reine Textdateien reichen nicht für echte Arbeitsblätter. |
+| Mittel | Echtes Embedding-Retrieval | Der aktuelle RAG-Service liefert noch keine semantisch besten Treffer. |
+| Mittel | Persistente Sessions | Lernprofile gehen beim Neustart verloren. |
+| Niedrig | Multi-Agent-Orchestrierung | Erst sinnvoll, wenn Persistenz, Evaluation und Guardrails stabiler sind. |
+
+---
+
+## Feedback-Notizen und Prioritäten
+
+| Feedback-/Review-Punkt | Priorität | Konsequenz für Termin 5/6 |
+|---|---|---|
+| Architekturentscheidung muss klar begründet sein. | Hoch | Pfad B wird dokumentiert: Vertiefung statt Multi-Agent. |
+| Das System braucht nachvollziehbare Traces. | Hoch | `trace_id`, LLM-Latenz, Response-Vorschau und Tool Calls werden geloggt. |
+| Upload-Verhalten ist noch zu schwach für echte PDFs. | Hoch | PyMuPDF/PDF-Parsing als nächster technischer Schwerpunkt. |
+| RAG ist bisher nur Mock-Retrieval. | Mittel | ChromaDB oder pgvector für echte Similarity-Suche vorbereiten. |
+| Tests müssen nicht exakte Antworten prüfen, sondern Verhalten. | Hoch | Termin 5: semantische Tests für Tool Calls, Edge Cases und Antwortstruktur. |
+| Guardrails gegen direkte Lösungsausgabe fehlen noch. | Hoch | Termin 6: Output-Monitoring und Tutor-Scope-Regeln ergänzen. |
+
+**Kurzfazit Termin 4:**
+StudyMummy bleibt bewusst ein Single-Agent-System mit vertiefter Tool-/RAG-Integration. Die Entscheidung ist für das MVP sinnvoll, weil der Tutor-Dialog sequenziell ist und die größten Risiken aktuell in Robustheit, Observability, Perception und Persistenz liegen. Multi-Agent bleibt als spätere Skalierungsoption erhalten, sobald die Kernflüsse stabil und messbar sind.
 
 ---
 
@@ -586,14 +717,14 @@ Die `trace_id` wird auch im Response-Header `X-Trace-Id` und im JSON-Body zurüc
 
 ---
 
-## Nächste Schritte (Übungsblatt 04+)
+## Nächste Schritte (Übungsblatt 05+)
 
 | Aufgabe | Priorität | Ziel-Termin |
 |---|---|---|
-| ChromaDB-Anbindung für echtes Embedding-Retrieval | Hoch | Übungsblatt 04 |
-| PyMuPDF für PDF-Upload | Hoch | Übungsblatt 04 |
-| PostgreSQL / Supabase für persistente Sessions | Mittel | Übungsblatt 04 |
-| Multi-Agent: Orchestrator + Worker | Mittel | Übungsblatt 04 |
+| ChromaDB-Anbindung für echtes Embedding-Retrieval | Hoch | Übungsblatt 05 |
+| PyMuPDF für PDF-Upload | Hoch | Übungsblatt 05 |
+| PostgreSQL / Supabase für persistente Sessions | Mittel | Übungsblatt 05 |
+| Multi-Agent: Orchestrator + Worker | Niedrig | Spätere Skalierungsoption |
 | Semantische Tests für LLM-Antworten | Hoch | Übungsblatt 05 |
 | Guardrails gegen Prompt Injection | Hoch | Übungsblatt 06 |
 
@@ -619,4 +750,3 @@ open http://localhost:8000/docs
 pip install -e ".[dev]"
 pytest tests/ -v
 ```
-

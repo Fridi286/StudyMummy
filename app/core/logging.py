@@ -19,12 +19,24 @@ def get_trace_id() -> str:
     return tid
 
 
+class TraceIdFormatter(logging.Formatter):
+    def format(self, record: logging.LogRecord) -> str:
+        if not hasattr(record, "trace_id"):
+            record.trace_id = get_trace_id()
+        return super().format(record)
+
+
 def setup_logging(level: str = "INFO") -> None:
-    logging.basicConfig(
-        stream=sys.stdout,
-        level=getattr(logging, level.upper(), logging.INFO),
-        format="%(asctime)s [%(levelname)s] trace=%(trace_id)s %(name)s: %(message)s",
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(
+        TraceIdFormatter(
+            "%(asctime)s [%(levelname)s] trace=%(trace_id)s %(name)s: %(message)s"
+        )
     )
+    root_logger = logging.getLogger()
+    root_logger.handlers.clear()
+    root_logger.addHandler(handler)
+    root_logger.setLevel(getattr(logging, level.upper(), logging.INFO))
 
 
 class TraceAdapter(logging.LoggerAdapter):
