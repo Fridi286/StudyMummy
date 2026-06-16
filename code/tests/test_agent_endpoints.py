@@ -4,6 +4,14 @@ Integrationstests für Agent-Endpunkte (ohne echten LLM-Call).
 from fastapi.testclient import TestClient
 from unittest.mock import patch, AsyncMock
 from app.main import app
+from app.api.dependencies import get_current_user
+from app.db.models import User
+from app.models.memory import WorkingMemory, LearningProfile
+
+async def override_get_current_user():
+    return User(user_id="user_42", username="test", email="test@test.com")
+
+app.dependency_overrides[get_current_user] = override_get_current_user
 
 client = TestClient(app)
 
@@ -15,19 +23,21 @@ def test_health():
 
 
 def test_get_session():
-    r = client.get("/api/v1/memory/session/test_session")
-    assert r.status_code == 200
-    data = r.json()
-    assert data["session_id"] == "test_session"
-    assert "dialog_history" in data
+    with patch("app.api.v1.endpoints.memory.get_or_create_session", new_callable=AsyncMock, return_value=WorkingMemory(session_id="test_session")):
+        r = client.get("/api/v1/memory/session/test_session")
+        assert r.status_code == 200
+        data = r.json()
+        assert data["session_id"] == "test_session"
+        assert "dialog_history" in data
 
 
 def test_get_learning_profile():
-    r = client.get("/api/v1/memory/profile/user_42")
-    assert r.status_code == 200
-    data = r.json()
-    assert data["user_id"] == "user_42"
-    assert "confidence_scores" in data
+    with patch("app.api.v1.endpoints.memory.get_or_create_profile", new_callable=AsyncMock, return_value=LearningProfile(user_id="user_42")):
+        r = client.get("/api/v1/memory/profile")
+        assert r.status_code == 200
+        data = r.json()
+        assert data["user_id"] == "user_42"
+        assert "confidence_scores" in data
 
 
 def test_document_upload_text_file():
@@ -56,6 +66,12 @@ def test_chat_endpoint_mocked():
         "app.api.v1.endpoints.agent._llm.chat_with_tools",
         new_callable=AsyncMock,
         return_value=("Was weißt du über lineare Funktionen?", []),
+    ), patch(
+        "app.api.v1.endpoints.agent.get_or_create_session", new_callable=AsyncMock, return_value=WorkingMemory(session_id="sess_1")
+    ), patch(
+        "app.api.v1.endpoints.agent.append_dialog", new_callable=AsyncMock
+    ), patch(
+        "app.api.v1.endpoints.agent.get_dialog_as_messages", new_callable=AsyncMock, return_value=[]
     ):
         r = client.post("/api/v1/agent/chat", json={
             "session_id": "sess_1",

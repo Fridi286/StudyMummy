@@ -1,6 +1,7 @@
 """
 Agent-Endpunkte: Chat, Dokument-Upload, Quiz, Cheatsheet.
 """
+from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from app.models.agent import (
     ChatRequest, ChatResponse,
@@ -10,6 +11,10 @@ from app.models.agent import (
 )
 from app.services.llm_service import LLMService
 from app.services.rag_service import RAGService, get_rag_service
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.db.session import get_async_db
+from app.api.dependencies import get_current_user
+from app.db.models import User
 from app.services.session_service import (
     get_or_create_session, append_dialog,
     get_dialog_as_messages,
@@ -25,25 +30,27 @@ _llm = LLMService()
 @router.post("/chat", response_model=ChatResponse, summary="Sokratischer Tutor-Chat")
 async def chat(
     req: ChatRequest,
-    rag: RAGService = Depends(get_rag_service),
+    rag: Annotated[RAGService, Depends(get_rag_service)],
+    db: Annotated[AsyncSession, Depends(get_async_db)],
+    current_user: Annotated[User, Depends(get_current_user)]
 ):
     """
     Hauptendpunkt: Nutzer schreibt eine Nachricht, der Agent antwortet sokratisch
     und nutzt bei Bedarf Tools (evaluate_answer, update_learning_profile, award_coins).
     """
     # Working Memory auffrischen
-    session = get_or_create_session(req.session_id)
+    session = await get_or_create_session(db, req.session_id, current_user.user_id)
     if req.task_id:
         session.current_task_id = req.task_id
 
     # Nachricht ins Gedächtnis
-    append_dialog(req.session_id, "user", req.message)
+    await append_dialog(db, req.session_id, "user", req.message)
 
     # RAG-Kontext holen
     context = rag.retrieve(req.message)
 
     # Dialog-History für LLM
-    messages = get_dialog_as_messages(req.session_id)
+    messages = await get_dialog_as_messages(db, req.session_id, current_user.user_id)
 
     # LLM-Aufruf mit Tool Use
     reply, tools_called = await _llm.chat_with_tools(
@@ -51,7 +58,7 @@ async def chat(
         extra_context=context or None,
     )
 
-    append_dialog(req.session_id, "assistant", reply)
+    await append_dialog(db, req.session_id, "assistant", reply)
 
     return ChatResponse(
         session_id=req.session_id,
@@ -64,8 +71,8 @@ async def chat(
 
 @router.post("/upload", response_model=DocumentUploadResponse, summary="Dokument hochladen & Aufgaben extrahieren")
 async def upload_document(
-    file: UploadFile = File(...),
-    rag: RAGService = Depends(get_rag_service),
+    file: Annotated[UploadFile, File(...)],
+    rag: Annotated[RAGService, Depends(get_rag_service)]
 ):
     """
     Perception-Schicht: Lädt ein Dokument hoch, extrahiert Text,
@@ -109,12 +116,16 @@ async def generate_quiz(req: QuizRequest):
 
 
 @router.post("/cheatsheet", response_model=CheatsheetResponse, summary="Cheatsheet erstellen")
-async def create_cheatsheet(req: CheatsheetRequest):
+async def create_cheatsheet(
+    req: CheatsheetRequest,
+    db: Annotated[AsyncSession, Depends(get_async_db)],
+    current_user: Annotated[User, Depends(get_current_user)]
+):
     """Action-Schicht: Erstellt ein personalisiertes Cheatsheet nach der Lerneinheit."""
     from app.services.session_service import get_or_create_session
     from app.tools.study_tools import _create_cheatsheet
 
-    session = get_or_create_session(req.session_id)
+    session = await get_or_create_session(db, req.session_id, current_user.user_id)
     topics = ["Allgemeine Konzepte"]  # TODO: aus Lernprofil laden
     result = await _create_cheatsheet(
         user_id=req.user_id,
