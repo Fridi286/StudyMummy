@@ -1,0 +1,85 @@
+<div class="flex-1 max-w-6xl w-full mx-auto flex flex-col gap-12 px-4">
+  <!-- Header -->
+  <div class="flex flex-col items-center justify-center text-center">
+    <h1 class="text-5xl font-extrabold tracking-tight lg:text-6xl mb-4 text-indigo-600">
+      Dashboard
+    </h1>
+    <p class="text-xl text-slate-600 max-w-2xl">
+      Welcome to your protected Dashboard. Previewing the <strong>Aura</strong> theme powered by
+      Tailwind CSS v4 in Angular 22.
+    </p>
+  </div>
+
+  <!-- Component Grid -->
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+    <!-- Buttons -->
+    <p-card header="Buttons" styleClass="h-full">
+      <div class="flex flex-wrap gap-3">
+        <p-button label="Primary" icon="pi pi-check"></p-button>
+        <p-button label="Secondary" severity="secondary" variant="outlined"></p-button>
+        <p-button label="Success" severity="success"></p-button>
+        <p-button label="Danger" severity="danger" icon="pi pi-times"></p-button>
+        <p-button label="Help" severity="help" variant="text"></p-button>
+      </div>
+    </p-card>
+
+    <!-- Form Inputs -->
+    <p-card header="Form Elements" styleClass="h-full">
+      <div class="flex flex-col gap-4">
+        <div class="flex flex-col gap-2">
+          <label for="username" class="font-semibold text-sm">Username</label>
+          <input
+            pInputText
+            id="username"
+            [(ngModel)]="textValue"
+            placeholder="Enter your name"
+            class="w-full"
+          />
+        </div>
+
+        <div class="flex flex-col gap-2">
+          <label class="font-semibold text-sm">Select City</label>
+          <p-select
+            [options]="cities"
+            [(ngModel)]="selectedCity"
+            optionLabel="name"
+            placeholder="Choose a city"
+            class="w-full"
+          ></p-select>
+        </div>
+
+        <div class="flex items-center gap-2 mt-2">
+          <p-checkbox [(ngModel)]="checked" binary="true" inputId="accept"></p-checkbox>
+          <label for="accept" class="cursor-pointer text-sm font-medium"
+            >I accept the terms and conditions</label
+          >
+        </div>
+      </div>
+    </p-card>
+
+    <!-- Data / Feedback -->
+    <p-card header="Data Binding & Feedback" styleClass="h-full">
+      <div class="flex flex-col gap-6">
+        <div class="flex flex-col gap-2">
+          <span class="font-semibold text-sm">Overall Progress</span>
+          <p-progressBar [value]="progressValue"></p-progressBar>
+        </div>
+
+        <div class="p-4 rounded-lg bg-indigo-50 border border-indigo-100 text-sm">
+          <div class="font-semibold text-indigo-700 mb-2">Live State</div>
+          <ul class="flex flex-col gap-1 text-slate-600">
+            <li>
+              Input: <strong class="text-slate-900">{{ textValue || 'None' }}</strong>
+            </li>
+            <li>
+              City: <strong class="text-slate-900">{{ selectedCity?.name || 'None' }}</strong>
+            </li>
+            <li>
+              Checked: <strong class="text-slate-900">{{ checked ? 'Yes' : 'No' }}</strong>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </p-card>
+  </div>
+</div>

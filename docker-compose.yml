@@ -14,7 +14,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       # Mount initialization script to auto-run on container start
-      - ./app/db/db_init.sql:/docker-entrypoint-initdb.d/db_init.sql
+      - ./backend/app/db/db_init.sql:/docker-entrypoint-initdb.d/db_init.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d studymummy"]
       interval: 5s
@@ -22,7 +22,7 @@ services:
       retries: 5
 
   web:
-    build: code
+    build: ./backend
     container_name: studymummy_web
     restart: always
     ports:
@@ -33,6 +33,7 @@ services:
       - LOG_LEVEL=INFO
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/studymummy
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL=${OPENAI_MODEL}
       - HAW_ICC_API_KEY=${HAW_ICC_API_KEY}
       - HAW_ICC_BASE_URL=${HAW_ICC_BASE_URL}
     depends_on:
@@ -40,7 +41,21 @@ services:
         condition: service_healthy
     volumes:
       # Optional: bind mount code for live reloading during development
-      - ./app:/app/app
+      - ./backend/app:/app/app
+
+  frontend:
+    build: ./frontend
+    container_name: studymummy_frontend
+    restart: always
+    ports:
+      - "4200:4200"
+    environment:
+      - CHOKIDAR_USEPOLLING=true # Useful for live-reloading inside Docker
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules # Prevents local node_modules from overwriting the container's
+    depends_on:
+      - web
 
 volumes:
   postgres_data:

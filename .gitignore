@@ -79,3 +79,7 @@ Thumbs.db
 # SQLite
 *.sqlite3
 *.db
+
+# User Uploads
+backend/static/avatars/*
+!backend/static/avatars/.gitkeep

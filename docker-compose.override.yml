@@ -6,4 +6,4 @@ services:
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     volumes:
       # Explicitly bind mount the app directory to allow Uvicorn to watch for file changes
-      - ./app:/app/app
+      - ./backend/app:/app/app
