@@ -1,0 +1,66 @@
+@if (authService.isAuthenticated()) {
+<nav class="bg-white shadow-sm border-b border-slate-200">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="flex justify-between h-16 items-center">
+      <div class="flex-shrink-0 flex items-center">
+        <a routerLink="/" class="text-xl font-bold text-indigo-600 tracking-tight">StudyMummy</a>
+      </div>
+      <div class="flex items-center gap-4">
+        
+        <!-- AI Chat Link -->
+        <a routerLink="/ai-chat" class="flex items-center gap-2 text-gray-500 hover:text-indigo-600 font-medium transition-colors cursor-pointer mr-2">
+          <i class="pi pi-sparkles text-xl"></i>
+          <span class="hidden sm:inline">AI Tutor</span>
+        </a>
+
+        <!-- Social Link -->
+        <a routerLink="/social" class="flex items-center gap-2 text-gray-500 hover:text-indigo-600 font-medium transition-colors cursor-pointer mr-2">
+          <i class="pi pi-users text-xl"></i>
+          <span class="hidden sm:inline">Social</span>
+        </a>
+
+        <!-- Notification Bell -->
+        <i class="pi pi-bell text-xl text-gray-500 cursor-pointer hover:text-indigo-600 transition-colors relative"
+           (click)="op.toggle($event)">
+           <p-badge *ngIf="pendingRequests().length > 0" [value]="pendingRequests().length" severity="danger" styleClass="absolute -top-2 -right-2"></p-badge>
+        </i>
+        
+        <p-popover #op>
+            <div class="w-80">
+                <h4 class="font-bold border-b pb-2 mb-2">Pending Friend Requests</h4>
+                <div *ngIf="pendingRequests().length === 0" class="text-sm text-gray-500 p-2 text-center">
+                    No pending requests.
+                </div>
+                <div *ngFor="let req of pendingRequests()" class="flex items-center justify-between p-2 hover:bg-gray-50 rounded">
+                    <div class="flex items-center gap-2">
+                        <p-avatar [image]="req.friend.avatar_url | avatarUrl" [label]="!req.friend.avatar_url ? (req.friend | initials) : undefined" shape="circle"></p-avatar>
+                        <span class="font-medium text-sm">{{req.friend.username}}</span>
+                    </div>
+                    <div class="flex gap-1">
+                        <p-button icon="pi pi-check" [rounded]="true" [text]="true" severity="success" size="small" (onClick)="acceptRequest(req)"></p-button>
+                        <p-button icon="pi pi-times" [rounded]="true" [text]="true" severity="danger" size="small" (onClick)="declineRequest(req)"></p-button>
+                    </div>
+                </div>
+            </div>
+        </p-popover>
+
+        <!-- User Menu -->
+        <button (click)="userMenu.toggle($event)"
+          class="focus:outline-none hover:ring-2 hover:ring-indigo-500 hover:ring-offset-2 rounded-full transition-all ml-2">
+          @if (fullAvatarUrl()) {
+            <img 
+              [src]="fullAvatarUrl()" 
+              class="rounded-full object-cover shadow-sm border-2 border-indigo-100 bg-white"
+              style="width: 2.5rem; height: 2.5rem; min-width: 2.5rem; min-height: 2.5rem;"
+              alt="Avatar" />
+          } @else {
+            <p-avatar [label]="userInitials()" shape="circle"
+              styleClass="bg-indigo-600 text-white font-bold cursor-pointer" [style]="{'width': '2.5rem', 'height': '2.5rem'}"></p-avatar>
+          }
+        </button>
+        <p-menu #userMenu [model]="menuItems" [popup]="true"></p-menu>
+      </div>
+    </div>
+  </div>
+</nav>
+}

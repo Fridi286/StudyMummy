@@ -1,0 +1,103 @@
+<div class="flex h-[calc(100vh-5rem)] w-full max-w-5xl mx-auto p-4 gap-4">
+
+  <!-- Left Sidebar: Sessions -->
+  <div class="w-64 flex-shrink-0 flex flex-col gap-3">
+    <p-button label="New Chat" icon="pi pi-plus" styleClass="w-full" (onClick)="startNewSession()">
+    </p-button>
+
+    <div class="flex-1 bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col">
+      <div class="p-3 border-b border-gray-100">
+        <span class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Previous Chats</span>
+      </div>
+      <div class="flex-1 overflow-y-auto">
+        <div *ngIf="sessions().length === 0" class="p-4 text-center text-sm text-gray-400">
+          No previous chats yet.
+        </div>
+        <div *ngFor="let s of sessions()" (click)="loadSession(s)"
+          class="group flex items-center gap-2 p-3 cursor-pointer hover:bg-indigo-50 border-b border-gray-50 transition-colors"
+          [class.bg-indigo-50]="activeSessionId() === s.session_id"
+          [class.border-l-2]="activeSessionId() === s.session_id"
+          [class.border-l-indigo-500]="activeSessionId() === s.session_id">
+          <i class="pi pi-comments text-gray-400 text-sm flex-shrink-0"></i>
+          <div class="min-w-0 flex-1">
+            <div class="text-xs text-gray-600 truncate font-medium">Chat session</div>
+            <div class="text-xs text-gray-400">{{formatDate(s.created_at)}}</div>
+          </div>
+          <button (click)="deleteSession($event, s)"
+            class="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-red-100 text-gray-400 hover:text-red-500 flex-shrink-0">
+            <i class="pi pi-trash text-xs"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: Active Chat -->
+  <div class="flex-1 flex flex-col gap-3 min-w-0">
+
+    <!-- Header -->
+    <div class="flex items-center gap-3 px-1">
+      <div
+        class="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow">
+        <i class="pi pi-sparkles text-white text-sm"></i>
+      </div>
+      <h1 class="text-lg font-bold text-gray-900">StudyMummy AI</h1>
+    </div>
+
+    <!-- Messages -->
+    <div #scrollContainer
+      class="flex-1 overflow-y-auto flex flex-col gap-4 bg-white border border-gray-200 rounded-xl p-4">
+
+      <div *ngFor="let msg of messages()" class="flex w-full"
+        [ngClass]="msg.role === 'user' ? 'justify-end' : 'justify-start'">
+
+        <div *ngIf="msg.role === 'assistant'" class="flex gap-3 max-w-[85%]">
+          <div
+            class="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center flex-shrink-0 mt-1 shadow">
+            <i class="pi pi-sparkles text-white text-xs"></i>
+          </div>
+          <div
+            class="bg-gray-50 border border-gray-200 text-gray-800 px-4 py-3 rounded-2xl rounded-tl-none text-sm leading-relaxed whitespace-pre-wrap">
+            {{msg.content}}
+          </div>
+        </div>
+
+        <div *ngIf="msg.role === 'user'" class="flex gap-3 max-w-[85%]">
+          <div
+            class="bg-indigo-600 text-white px-4 py-3 rounded-2xl rounded-tr-none text-sm leading-relaxed whitespace-pre-wrap">
+            {{msg.content}}
+          </div>
+          <p-avatar [image]="authService.cachedAvatarUrl() || undefined"
+            [label]="!authService.cachedAvatarUrl() ? (authService.currentUser()?.username?.substring(0,1)?.toUpperCase() || 'U') : undefined"
+            shape="circle" class="flex-shrink-0 mt-1" styleClass="w-8 h-8 text-xs shadow">
+          </p-avatar>
+        </div>
+
+      </div>
+
+      <div *ngIf="isLoading()" class="flex gap-3 justify-start">
+        <div
+          class="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center flex-shrink-0 shadow">
+          <i class="pi pi-sparkles text-white text-xs"></i>
+        </div>
+        <div class="bg-gray-50 border border-gray-200 px-4 py-3 rounded-2xl rounded-tl-none">
+          <i class="pi pi-spinner pi-spin text-indigo-400 text-sm"></i>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Input -->
+    <div class="bg-white border border-gray-200 rounded-2xl p-3 flex gap-3 items-end">
+      <textarea
+        class="flex-1 resize-none outline-none text-sm text-gray-800 placeholder-gray-400 max-h-32 min-h-[2.5rem] overflow-y-auto bg-transparent leading-relaxed"
+        [(ngModel)]="messageInput" (keydown)="onKeydown($event)" placeholder="Ask me anything about your studies..."
+        rows="1">
+      </textarea>
+      <p-button icon="pi pi-send" [rounded]="true" [disabled]="!messageInput.trim() || isLoading()"
+        (onClick)="sendMessage()" styleClass="w-10 h-10 flex-shrink-0">
+      </p-button>
+    </div>
+
+  </div>
+</div>

@@ -1,0 +1,67 @@
+<div
+  class="flex-1 flex items-center justify-center p-4 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-indigo-100 via-white to-slate-50"
+>
+  <div class="w-full max-w-md">
+    <p-card
+      styleClass="shadow-2xl border border-slate-200/60 rounded-3xl p-6 sm:p-8 bg-white/80 backdrop-blur-md"
+    >
+      <div class="text-center mb-10">
+        <h1 class="text-5xl font-extrabold text-indigo-600 tracking-tight mb-3">StudyMummy</h1>
+        <p class="text-slate-600 text-lg">Welcome back! Please sign in.</p>
+      </div>
+
+      <form (ngSubmit)="onLogin()" class="flex flex-col gap-8">
+        @if (errorMessage()) {
+          <div
+            class="p-4 bg-red-50 text-red-700 text-sm rounded-xl border border-red-200 shadow-sm"
+          >
+            {{ errorMessage() }}
+          </div>
+        }
+
+        <div class="flex flex-col gap-8 mt-2">
+          <p-floatlabel class="block w-full">
+            <input
+              pInputText
+              id="username"
+              name="username"
+              [(ngModel)]="username"
+              required
+              class="w-full"
+            />
+            <label for="username">Username</label>
+          </p-floatlabel>
+
+          <p-floatlabel class="block w-full">
+            <p-password
+              id="password"
+              name="password"
+              [(ngModel)]="password"
+              [toggleMask]="true"
+              [feedback]="false"
+              required
+              styleClass="w-full"
+              inputStyleClass="w-full"
+            ></p-password>
+            <label for="password">Password</label>
+          </p-floatlabel>
+        </div>
+
+        <p-button
+          type="submit"
+          label="Sign In"
+          [loading]="loading()"
+          class="w-full mt-4"
+          styleClass="w-full py-4 text-lg font-semibold rounded-xl shadow-md"
+        ></p-button>
+      </form>
+
+      <div class="mt-8 text-center text-sm text-slate-600 font-medium">
+        Don't have an account?
+        <a routerLink="/register" class="text-indigo-600 font-bold hover:underline ml-1"
+          >Create an account</a
+        >
+      </div>
+    </p-card>
+  </div>
+</div>
