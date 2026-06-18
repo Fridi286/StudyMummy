@@ -20,11 +20,76 @@ from app.services.session_service import (
     get_dialog_as_messages,
 )
 from app.core.logging import get_logger, get_trace_id
+from app.db.models import Session as DbSession, ChatLog
+from sqlalchemy import select, desc
 
 log = get_logger(__name__)
 router = APIRouter(prefix="/agent", tags=["Agent"])
 
 _llm = LLMService()
+
+
+@router.get("/sessions", summary="List user's chat sessions")
+async def list_sessions(
+    db: Annotated[AsyncSession, Depends(get_async_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    stmt = (
+        select(DbSession)
+        .where(DbSession.user_id == current_user.user_id)
+        .order_by(desc(DbSession.created_at))
+    )
+    result = await db.execute(stmt)
+    sessions = result.scalars().all()
+
+    return [
+        {
+            "session_id": s.session_id,
+            "created_at": s.created_at,
+            "active": s.active,
+        }
+        for s in sessions
+    ]
+
+
+@router.get("/sessions/{session_id}/messages", summary="Load messages for a session")
+async def get_session_messages(
+    session_id: str,
+    db: Annotated[AsyncSession, Depends(get_async_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    # Verify ownership
+    stmt = select(DbSession).where(
+        DbSession.session_id == session_id,
+        DbSession.user_id == current_user.user_id
+    )
+    session = (await db.execute(stmt)).scalars().first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    msg_stmt = select(ChatLog).where(ChatLog.session_id == session_id).order_by(ChatLog.timestamp)
+    messages = (await db.execute(msg_stmt)).scalars().all()
+
+    return [{"role": m.role, "content": m.content, "timestamp": m.timestamp} for m in messages]
+
+
+@router.delete("/sessions/{session_id}", summary="Delete a chat session")
+async def delete_session(
+    session_id: str,
+    db: Annotated[AsyncSession, Depends(get_async_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    stmt = select(DbSession).where(
+        DbSession.session_id == session_id,
+        DbSession.user_id == current_user.user_id
+    )
+    session = (await db.execute(stmt)).scalars().first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    await db.delete(session)
+    await db.commit()
+    return {"message": "Session deleted"}
 
 
 @router.post("/chat", response_model=ChatResponse, summary="Sokratischer Tutor-Chat")

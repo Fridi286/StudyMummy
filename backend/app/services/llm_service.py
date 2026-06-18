@@ -4,12 +4,13 @@ Zentrale Stelle für alle LLM-Interaktionen – leicht gegen ein anderes LLM aus
 """
 import json
 import time
-from typing import Any, Optional, Iterable, cast
+from typing import Optional, Iterable, cast
 from openai import AsyncOpenAI
-from openai.types.chat import ChatCompletionMessageParam, ChatCompletionToolParam
+from openai.types.chat import ChatCompletionMessageParam, ChatCompletionToolParam, ChatCompletionContentPartParam
 from app.core.config import get_settings
 from app.core.logging import get_logger, get_trace_id
 from app.tools.registry import get_all, get, as_openai_tools
+from app.models.agent import ExtractedTask
 
 log = get_logger(__name__)
 
@@ -25,16 +26,16 @@ Prinzipien:
 5. Antworte immer auf Deutsch, klar und motivierend."""
 
 
-def _preview(value: Any, max_chars: int = 180) -> str:
+def _preview(value: str | Iterable[ChatCompletionContentPartParam], max_chars: int = 180) -> str:
     text = str(value).replace("\n", " ").strip()
     if len(text) <= max_chars:
         return text
     return text[: max_chars - 3] + "..."
 
 
-def _last_user_message(messages: list[dict[str, Any]]) -> str:
+def _last_user_message(messages: list[ChatCompletionMessageParam]) -> str:
     for message in reversed(messages):
-        if message.get("role") == "user":
+        if message["role"] == "user":
             return _preview(message.get("content", ""))
     return ""
 
@@ -56,9 +57,9 @@ class LLMService:
 
     async def chat_with_tools(
         self,
-        messages: list[dict[str, Any]],
+        messages: list[ChatCompletionMessageParam],
         system_prompt: str = SOCRATIC_SYSTEM_PROMPT,
-        extra_context: Optional[str] = None,
+        extra_context: str | None = None,
     ) -> tuple[str, list[str]]:
         """
         Führt einen LLM-Call mit Tool Use durch (ReAct-Loop).
@@ -71,7 +72,7 @@ class LLMService:
             f"extra_context={bool(extra_context)}, input_preview={_last_user_message(messages)!r}"
         )
 
-        full_messages = [{"role": "system", "content": system_prompt}]
+        full_messages: list[ChatCompletionMessageParam] = [{"role": "system", "content": system_prompt}]
         if extra_context:
             full_messages.append({
                 "role": "system",
@@ -80,34 +81,36 @@ class LLMService:
         full_messages.extend(messages)
 
         tools = as_openai_tools()
+        supports_tools = "qwen" not in self.model.lower()
         tool_calls_made: list[str] = []
 
         # ReAct-Loop: Thought → Action → Observation
         for _ in range(5):  # max 5 Iterationen als Guardrail
             call_started_at = time.perf_counter()
             try:
-                if tools:
+                if tools and supports_tools:
+                    log.info(f"[{trace}] LLM call with model={self.model!r}, tool_choice='auto'")
                     response = await self.client.chat.completions.create(
                         model=self.model,
                         temperature=self.temperature,
-                        messages=cast(Iterable[ChatCompletionMessageParam], full_messages),
-                        tools=cast(Iterable[ChatCompletionToolParam], tools),
+                        messages=full_messages,
+                        tools=tools,
                         tool_choice="auto",
                     )
                 else:
                     response = await self.client.chat.completions.create(
                         model=self.model,
                         temperature=self.temperature,
-                        messages=cast(Iterable[ChatCompletionMessageParam], full_messages),
+                        messages=full_messages,
                     )
             except Exception as e:
-                duration_ms = round((time.perf_counter() - started_at) * 1000, 1)
-                log.error(f"[{trace}] LLM API error after {duration_ms}ms: {e}")
-                return (
+                    duration_ms = round((time.perf_counter() - started_at) * 1000, 1)
+                    log.error(f"[{trace}] LLM API error after {duration_ms}ms: {e}")
+                    return (
                     "Ich kann gerade keine zuverlässige KI-Antwort erzeugen. "
                     "Bitte versuche es gleich noch einmal oder formuliere die Frage etwas kürzer.",
-                    tool_calls_made,
-                )
+                        tool_calls_made,
+                    )
 
             choice = response.choices[0]
             assistant_msg = choice.message
@@ -119,7 +122,8 @@ class LLMService:
                 f"response_preview={response_preview!r}"
             )
 
-            full_messages.append(assistant_msg.model_dump(exclude_none=True))
+            msg_dict: ChatCompletionMessageParam = assistant_msg.model_dump(exclude_none=True)  # type: ignore
+            full_messages.append(msg_dict)
 
             if not assistant_msg.tool_calls:
                 duration_ms = round((time.perf_counter() - started_at) * 1000, 1)
@@ -167,7 +171,7 @@ class LLMService:
         log.warning(f"[{trace}] LLM max steps reached after {duration_ms}ms")
         return "Maximale Schrittanzahl erreicht.", tool_calls_made
 
-    async def extract_tasks_from_text(self, text: str) -> list[dict[str, Any]]:
+    async def extract_tasks_from_text(self, text: str) -> list[ExtractedTask]:
         """
         Perception-Schicht: Extrahiert strukturierte Aufgaben aus Freitext (PDF/OCR).
         Verwendet Structured Output via JSON Schema.

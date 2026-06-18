@@ -7,7 +7,24 @@ mocked or recorded agent runs without depending on a live LLM.
 from dataclasses import dataclass
 import re
 from statistics import mean
-from typing import Any
+from typing_extensions import TypedDict
+
+class ChatRunMetrics(TypedDict):
+    variant: str
+    has_non_empty_response: bool
+    has_trace_id: bool
+    asks_or_guides: bool
+    avoids_direct_solution: bool
+    tool_coverage: float
+    quantitative_score: float
+    qualitative_label: str
+
+class TraceRunComparison(TypedDict):
+    run_count: int
+    same_input: bool
+    unique_trace_ids: int
+    same_tool_sequence: bool
+    response_shape_stable: bool
 
 
 TRACE_ID_PATTERN = re.compile(r"^[a-f0-9]{8}$", re.IGNORECASE)
@@ -38,7 +55,7 @@ class ChatRun:
     expected_tools: tuple[str, ...] = ()
 
 
-def evaluate_chat_run(run: ChatRun) -> dict[str, Any]:
+def evaluate_chat_run(run: ChatRun) -> ChatRunMetrics:
     """Return quantitative and qualitative scores for one chat run."""
     response_lower = run.response_text.lower()
     expected_tools = set(run.expected_tools)
@@ -90,7 +107,7 @@ def qualitative_label(
     return "needs_attention"
 
 
-def compare_trace_runs(runs: list[ChatRun]) -> dict[str, Any]:
+def compare_trace_runs(runs: list[ChatRun]) -> TraceRunComparison:
     """Compare repeated runs with the same input for trace-level stability."""
     if not runs:
         return {

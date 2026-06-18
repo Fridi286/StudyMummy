@@ -2,9 +2,9 @@
 Aufgaben-Endpunkte: CRUD für strukturierte Tasks.
 """
 from fastapi import APIRouter, HTTPException
-from app.models.task import Task, TaskUpdate, TaskStatus
+from app.models.task import Task, TaskUpdate
 
-router = APIRouter(prefix="/tasks", tags=["Tasks"])
+router = APIRouter()
 
 _tasks: dict[str, Task] = {}  # In-Memory; für Produktion: DB-Repository
 

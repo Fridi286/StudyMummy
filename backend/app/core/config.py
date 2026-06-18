@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     app_version: str = "0.1.0"
     app_env: str = "development"
     log_level: str = "INFO"
-    secret_key: str = "super_secret_default_key"
+    secret_key: str = "change_me_in_production_use_a_32_plus_byte_random_hex_string_here"
 
     # LLM
     openai_api_key: str = "MISSING_KEY"

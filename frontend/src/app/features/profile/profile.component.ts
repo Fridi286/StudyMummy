@@ -203,7 +203,20 @@ export class ProfileComponent implements OnInit {
       error: (err) => {
         console.error(err);
         this.saving.set(false);
-        this.messageService.add({ severity: 'error', summary: 'Error', detail: err.error?.detail || 'Failed to update profile' });
+        let errorMsg = 'Failed to update profile';
+        const errorData = err.error;
+        if (errorData && errorData.detail) {
+          if (Array.isArray(errorData.detail)) {
+            errorMsg = errorData.detail.map((d: any) => {
+              const field = d.loc && d.loc.length > 1 ? d.loc[1] : '';
+              const msg = d.msg || 'Invalid value';
+              return field ? `${field}: ${msg}` : msg;
+            }).join(', ');
+          } else {
+            errorMsg = errorData.detail;
+          }
+        }
+        this.messageService.add({ severity: 'error', summary: 'Error', detail: errorMsg });
       }
     });
   }

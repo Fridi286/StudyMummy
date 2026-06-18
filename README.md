@@ -915,7 +915,7 @@ cp .env.example .env
 # OPENAI_API_KEY=sk-... in .env eintragen
 
 # 3. Server starten
-uvicorn app.main:app --reload
+docker compose up --build
 
 # 4. Interaktive API-Dokumentation
 open http://localhost:8000/docs

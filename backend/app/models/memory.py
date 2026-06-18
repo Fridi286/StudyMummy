@@ -5,6 +5,13 @@ from datetime import datetime, timezone
 from typing import ClassVar
 
 from pydantic import BaseModel, Field, ConfigDict
+from typing_extensions import TypedDict
+
+class EpisodicEventPayload(TypedDict, total=False):
+    score: float
+    hint_text: str
+    error_message: str
+    user_answer: str
 
 
 class DialogTurn(BaseModel):
@@ -32,7 +39,7 @@ class EpisodicEvent(BaseModel):
     session_id: str
     task_id: str
     event_type: str  # "solved", "error", "hint_given", "quiz_result"
-    payload: dict[str, object] = {}
+    payload: EpisodicEventPayload = {}
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 

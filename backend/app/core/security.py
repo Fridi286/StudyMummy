@@ -4,7 +4,17 @@ from argon2.exceptions import VerifyMismatchError
 import jwt
 
 
+from typing_extensions import TypedDict
 from app.core.config import get_settings
+
+class TokenPayload(TypedDict, total=False):
+    sub: str
+    username: str
+    first_name: str
+    last_name: str
+    avatar_url: str | None
+    exp: datetime
+    iat: datetime
 
 settings = get_settings()
 ph = PasswordHasher()
@@ -18,12 +28,12 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     except VerifyMismatchError:
         return False
 
-def create_access_token(data: dict[str, object], expires_delta: timedelta | None = None) -> str:
-    to_encode = data.copy()
+def create_access_token(data: TokenPayload, expires_delta: timedelta | None = None) -> str:
+    to_encode_dict = dict(data)
     if expires_delta:
         expire = datetime.now(timezone.utc) + expires_delta
     else:
         expire = datetime.now(timezone.utc) + timedelta(minutes=60 * 24)  # Default 24 hours
-    to_encode.update({"exp": expire, "iat": datetime.now(timezone.utc)})
-    encoded_jwt = jwt.encode(to_encode, settings.secret_key, algorithm="HS256")  # type: ignore
+    to_encode_dict.update({"exp": expire, "iat": datetime.now(timezone.utc)})
+    encoded_jwt = jwt.encode(to_encode_dict, settings.secret_key, algorithm="HS256")  # type: ignore
     return encoded_jwt

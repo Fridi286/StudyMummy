@@ -7,3 +7,5 @@ services:
     volumes:
       # Explicitly bind mount the app directory to allow Uvicorn to watch for file changes
       - ./backend/app:/app/app
+      # Persist uploaded avatars across container restarts
+      - ./backend/static:/app/static

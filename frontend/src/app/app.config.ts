@@ -7,6 +7,7 @@ import Aura from '@primeuix/themes/aura';
 
 import { routes } from './app.routes';
 import { authInterceptor } from './core/auth/auth.interceptor';
+import { ConfirmationService, MessageService } from 'primeng/api';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -22,5 +23,7 @@ export const appConfig: ApplicationConfig = {
         },
       },
     }),
+    ConfirmationService,
+    MessageService,
   ],
 };

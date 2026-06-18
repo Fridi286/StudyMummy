@@ -61,7 +61,21 @@ export class RegisterComponent {
       },
       error: (err) => {
         this.loading.set(false);
-        this.errorMessage.set(err.error?.detail || 'Registration failed. Please try again.');
+        const errorData = err.error;
+        if (errorData && errorData.detail) {
+          if (Array.isArray(errorData.detail)) {
+            const messages = errorData.detail.map((d: any) => {
+              const field = d.loc && d.loc.length > 1 ? d.loc[1] : '';
+              const msg = d.msg || 'Invalid value';
+              return field ? `${field}: ${msg}` : msg;
+            });
+            this.errorMessage.set(messages.join(', '));
+          } else {
+            this.errorMessage.set(errorData.detail);
+          }
+        } else {
+          this.errorMessage.set('Registration failed. Please try again.');
+        }
       },
     });
   }

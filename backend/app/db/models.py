@@ -3,7 +3,6 @@ from datetime import datetime, timezone
 from sqlalchemy import (
     String,
     Integer,
-    Float,
     Boolean,
     DateTime,
     ForeignKey,
@@ -132,3 +131,53 @@ class ChatLog(Base):
     timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     session: Mapped["Session"] = relationship("Session", back_populates="chat_logs")
+
+
+class Friendship(Base):
+    __tablename__: str = "friendships"
+    __table_args__: tuple[UniqueConstraint, ...] = (UniqueConstraint("user_id", "friend_id"),)
+
+    friendship_id: Mapped[str] = mapped_column(String(255), primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(255), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
+    friend_id: Mapped[str] = mapped_column(String(255), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
+    status: Mapped[str] = mapped_column(String(50), default="pending", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    user: Mapped["User"] = relationship("User", foreign_keys=[user_id])
+    friend: Mapped["User"] = relationship("User", foreign_keys=[friend_id])
+
+
+class Chatroom(Base):
+    __tablename__: str = "chatrooms"
+
+    room_id: Mapped[str] = mapped_column(String(255), primary_key=True)
+    name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    is_group: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    members: Mapped[list["ChatroomMember"]] = relationship("ChatroomMember", back_populates="chatroom", cascade="all, delete-orphan")
+    messages: Mapped[list["ChatMessage"]] = relationship("ChatMessage", back_populates="chatroom", cascade="all, delete-orphan", order_by="ChatMessage.created_at")
+
+
+class ChatroomMember(Base):
+    __tablename__: str = "chatroom_members"
+
+    room_id: Mapped[str] = mapped_column(String(255), ForeignKey("chatrooms.room_id", ondelete="CASCADE"), primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(255), ForeignKey("users.user_id", ondelete="CASCADE"), primary_key=True)
+    joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    chatroom: Mapped["Chatroom"] = relationship("Chatroom", back_populates="members")
+    user: Mapped["User"] = relationship("User")
+
+
+class ChatMessage(Base):
+    __tablename__: str = "chat_messages"
+
+    message_id: Mapped[str] = mapped_column(String(255), primary_key=True)
+    room_id: Mapped[str] = mapped_column(String(255), ForeignKey("chatrooms.room_id", ondelete="CASCADE"), nullable=False)
+    sender_id: Mapped[str] = mapped_column(String(255), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    chatroom: Mapped["Chatroom"] = relationship("Chatroom", back_populates="messages")
+    sender: Mapped["User"] = relationship("User")

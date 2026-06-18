@@ -1,13 +1,12 @@
 """
 Request/Response-Modelle für alle Agent-Endpunkte.
 """
-from typing import Annotated, Optional, Any
+from typing import Annotated, Optional
 from pydantic import BaseModel, StringConstraints
 
 
 class ChatRequest(BaseModel):
     session_id: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
-    user_id: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
     message: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
     task_id: Optional[str] = None
 
@@ -20,9 +19,26 @@ class ChatResponse(BaseModel):
     trace_id: str
 
 
+class ExtractedTask(BaseModel):
+    task_id: str
+    subject: str
+    topic: str
+    difficulty: int
+    task_text: str
+    required_concepts: list[str]
+    status: str = "open"
+
+
+class QuizQuestion(BaseModel):
+    id: str
+    text: str
+    options: list[str]
+    correct: str
+
+
 class DocumentUploadResponse(BaseModel):
     document_id: str
-    extracted_tasks: list[dict[str, Any]]
+    extracted_tasks: list[ExtractedTask]
     message: str
 
 
@@ -33,7 +49,7 @@ class QuizRequest(BaseModel):
 
 
 class QuizResponse(BaseModel):
-    questions: list[dict[str, Any]]
+    questions: list[QuizQuestion]
     topic: str
 
 

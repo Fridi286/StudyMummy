@@ -12,7 +12,7 @@ from app.services.session_service import (
 )
 from app.models.memory import WorkingMemory, LearningProfile
 
-router = APIRouter(prefix="/memory", tags=["Memory"])
+router = APIRouter()
 
 
 @router.get("/session/{session_id}", response_model=WorkingMemory)

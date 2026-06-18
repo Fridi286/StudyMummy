@@ -126,3 +126,39 @@ CREATE TABLE IF NOT EXISTS cheatsheets (
     topics_covered JSONB DEFAULT '[]'::jsonb,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+-- 14. Friendships Table
+CREATE TABLE IF NOT EXISTS friendships (
+    friendship_id VARCHAR(255) PRIMARY KEY,
+    user_id VARCHAR(255) NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    friend_id VARCHAR(255) NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    status VARCHAR(50) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'rejected')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (user_id, friend_id),
+    CHECK (user_id != friend_id)
+);
+
+-- 15. Chatrooms Table
+CREATE TABLE IF NOT EXISTS chatrooms (
+    room_id VARCHAR(255) PRIMARY KEY,
+    name VARCHAR(255),
+    is_group BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 16. Chatroom Members Table
+CREATE TABLE IF NOT EXISTS chatroom_members (
+    room_id VARCHAR(255) NOT NULL REFERENCES chatrooms(room_id) ON DELETE CASCADE,
+    user_id VARCHAR(255) NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    joined_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (room_id, user_id)
+);
+
+-- 17. Chat Messages Table
+CREATE TABLE IF NOT EXISTS chat_messages (
+    message_id VARCHAR(255) PRIMARY KEY,
+    room_id VARCHAR(255) NOT NULL REFERENCES chatrooms(room_id) ON DELETE CASCADE,
+    sender_id VARCHAR(255) NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    content TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);

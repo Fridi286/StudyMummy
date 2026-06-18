@@ -7,7 +7,7 @@ from typing import cast
 from openai.types.chat import ChatCompletionMessageParam
 
 from app.models.memory import WorkingMemory, DialogTurn, LearningProfile
-from app.db.models import Session, ChatLog, LearningProfile as DbLearningProfile, ConfidenceScore, Topic, Subject
+from app.db.models import Session, ChatLog, LearningProfile as DbLearningProfile, ConfidenceScore, Topic
 from app.core.logging import get_logger
 
 log = get_logger(__name__)
@@ -57,8 +57,15 @@ async def append_dialog(db: AsyncSession, session_id: str, role: str, content: s
 
 async def get_dialog_as_messages(db: AsyncSession, session_id: str, user_id: str) -> list[ChatCompletionMessageParam]:
     wm = await get_or_create_session(db, session_id, user_id)
-    return [cast(ChatCompletionMessageParam, cast(object, {"role": t.role, "content": t.content})) for t in wm.dialog_history]
-
+    messages: list[ChatCompletionMessageParam] = []
+    for t in wm.dialog_history:
+        if t.role == "user":
+            messages.append({"role": "user", "content": t.content})
+        elif t.role == "assistant":
+            messages.append({"role": "assistant", "content": t.content})
+        elif t.role == "system":
+            messages.append({"role": "system", "content": t.content})
+    return messages
 
 async def get_or_create_profile(db: AsyncSession, user_id: str) -> LearningProfile:
     stmt = (
@@ -82,8 +89,10 @@ async def get_or_create_profile(db: AsyncSession, user_id: str) -> LearningProfi
     )
     scores_result = await db.execute(scores_stmt)
     
-    confidence_scores = {}
-    for score_obj, topic_name in scores_result:
+    confidence_scores: dict[str, float] = {}
+    for row in scores_result.all():
+        score_obj = cast(ConfidenceScore, row[0])
+        topic_name = cast(str, row[1])
         confidence_scores[topic_name] = float(score_obj.confidence)
 
     return LearningProfile(
