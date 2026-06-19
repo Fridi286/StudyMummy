@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS users (
     avatar_url VARCHAR(255),
     password_hash VARCHAR(255) NOT NULL,
     coins INT DEFAULT 0 CHECK (coins >= 0),
+    experience INT DEFAULT 0 CHECK (experience >= 0),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -162,3 +163,45 @@ CREATE TABLE IF NOT EXISTS chat_messages (
     content TEXT NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+-- 18. Items Table
+CREATE TABLE IF NOT EXISTS items (
+    item_id VARCHAR(255) PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    type VARCHAR(50) NOT NULL,
+    icon_url VARCHAR(255),
+    effects JSONB,
+    cost INT NOT NULL DEFAULT 0,
+    is_buyable BOOLEAN DEFAULT TRUE NOT NULL
+);
+
+-- 19. Inventory Items Table
+CREATE TABLE IF NOT EXISTS inventory_items (
+    inventory_id VARCHAR(255) PRIMARY KEY,
+    user_id VARCHAR(255) NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    item_id VARCHAR(255) NOT NULL REFERENCES items(item_id) ON DELETE CASCADE,
+    quantity INT NOT NULL DEFAULT 1 CHECK (quantity >= 0),
+    acquired_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (user_id, item_id)
+);
+
+-- 20. Active Items Table
+CREATE TABLE IF NOT EXISTS active_items (
+    active_item_id VARCHAR(255) PRIMARY KEY,
+    user_id VARCHAR(255) NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    item_id VARCHAR(255) NOT NULL REFERENCES items(item_id) ON DELETE CASCADE,
+    name VARCHAR(100) NOT NULL,
+    effects JSONB NOT NULL,
+    activated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP WITH TIME ZONE
+);
+
+-- 21. Slot Machine Logs Table
+CREATE TABLE IF NOT EXISTS slot_machine_logs (
+    log_id VARCHAR(255) PRIMARY KEY,
+    user_id VARCHAR(255) NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    bet_amount INT NOT NULL,
+    payout INT NOT NULL,
+    timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+

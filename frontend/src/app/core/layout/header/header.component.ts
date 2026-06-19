@@ -1,6 +1,7 @@
-import { Component, OnInit, computed, inject, signal, effect } from '@angular/core';
+import { Component, OnInit, OnDestroy, computed, inject, signal, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterLink } from '@angular/router';
+import { RouterLink, Router, NavigationEnd } from '@angular/router';
+import { filter } from 'rxjs/operators';
 import { AuthService } from '../../auth/auth.service';
 import { SocialService, FriendshipResponse } from '../../services/social.service';
 import { ChatService } from '../../services/chat.service';
@@ -22,14 +23,18 @@ import { InitialsPipe } from '../../../shared/pipes/initials.pipe';
   ],
   templateUrl: './header.component.html',
 })
-export class HeaderComponent implements OnInit {
+export class HeaderComponent implements OnInit, OnDestroy {
   authService = inject(AuthService);
   socialService = inject(SocialService);
   chatService = inject(ChatService);
+  router = inject(Router);
 
   menuItems: MenuItem[] | undefined;
   
   pendingRequests = signal<FriendshipResponse[]>([]);
+  currentTime = signal(new Date());
+  isCasinoPage = signal(false);
+  clockInterval: any;
 
   userInitials = computed(() => {
     const user = this.authService.currentUser();
@@ -71,6 +76,27 @@ export class HeaderComponent implements OnInit {
         this.pendingRequests.set([]);
       }
     });
+
+    this.router.events.pipe(
+      filter(event => event instanceof NavigationEnd)
+    ).subscribe((event: any) => {
+      this.isCasinoPage.set(event.urlAfterRedirects.includes('/casino'));
+    });
+
+    // Initial check
+    setTimeout(() => {
+      this.isCasinoPage.set(this.router.url.includes('/casino'));
+    }, 0);
+
+    this.clockInterval = setInterval(() => {
+      this.currentTime.set(new Date());
+    }, 1000);
+  }
+
+  ngOnDestroy() {
+    if (this.clockInterval) {
+      clearInterval(this.clockInterval);
+    }
   }
 
   ngOnInit() {
@@ -82,6 +108,16 @@ export class HeaderComponent implements OnInit {
             label: 'Profile',
             icon: 'pi pi-user',
             routerLink: '/profile'
+          },
+          {
+            label: 'Inventory',
+            icon: 'pi pi-box',
+            routerLink: '/inventory'
+          },
+          {
+            label: 'Shop',
+            icon: 'pi pi-shopping-cart',
+            routerLink: '/shop'
           },
           {
             separator: true

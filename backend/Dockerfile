@@ -26,6 +26,7 @@ WORKDIR /app
 # Install runtime dependencies (e.g., curl for healthchecks)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
+    libcairo2 \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy virtual environment from builder

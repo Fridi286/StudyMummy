@@ -21,6 +21,7 @@ dependencies = [
     "argon2-cffi>=25.1.0",
     "email-validator>=2.3.0",
     "Pillow>=10.3.0",
+    "cairosvg>=2.9.0",
 ]
 
 [project.optional-dependencies]

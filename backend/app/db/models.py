@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from typing import Any
 
 from sqlalchemy import (
     String,
@@ -27,11 +28,20 @@ class User(Base):
     avatar_url: Mapped[str | None] = mapped_column(String(255), nullable=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     coins: Mapped[int] = mapped_column(Integer, default=0)
+    experience: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     learning_profile: Mapped["LearningProfile"] = relationship("LearningProfile", back_populates="user", uselist=False, cascade="all, delete-orphan")
     sessions: Mapped[list["Session"]] = relationship("Session", back_populates="user", cascade="all, delete-orphan")
     confidence_scores: Mapped[list["ConfidenceScore"]] = relationship("ConfidenceScore", back_populates="user", cascade="all, delete-orphan")
+    inventory_items: Mapped[list["InventoryItem"]] = relationship("InventoryItem", back_populates="user", cascade="all, delete-orphan")
+    active_items: Mapped[list["ActiveItem"]] = relationship("ActiveItem", back_populates="user", cascade="all, delete-orphan")
+
+    @property
+    def level(self) -> int:
+        # A simple leveling formula, e.g., 1 level per 100 xp. 
+        # You can adjust this to whatever curve you'd like!
+        return (self.experience // 100) + 1
 
 
 class LearningProfile(Base):
@@ -181,3 +191,61 @@ class ChatMessage(Base):
 
     chatroom: Mapped["Chatroom"] = relationship("Chatroom", back_populates="messages")
     sender: Mapped["User"] = relationship("User")
+
+
+class Item(Base):
+    __tablename__: str = "items"
+
+    item_id: Mapped[str] = mapped_column(String(255), primary_key=True)
+    name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    type: Mapped[str] = mapped_column(String(50), nullable=False)
+    icon_url: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    effects: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    cost: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    is_buyable: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+    inventory_items: Mapped[list["InventoryItem"]] = relationship("InventoryItem", back_populates="item", cascade="all, delete-orphan")
+
+
+class InventoryItem(Base):
+    __tablename__: str = "inventory_items"
+    __table_args__: tuple[UniqueConstraint, ...] = (UniqueConstraint("user_id", "item_id"),)
+
+    inventory_id: Mapped[str] = mapped_column(String(255), primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(255), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
+    item_id: Mapped[str] = mapped_column(String(255), ForeignKey("items.item_id", ondelete="CASCADE"), nullable=False)
+    quantity: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    acquired_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    user: Mapped["User"] = relationship("User", back_populates="inventory_items")
+    item: Mapped["Item"] = relationship("Item", back_populates="inventory_items")
+
+
+class ActiveItem(Base):
+    __tablename__: str = "active_items"
+
+    active_item_id: Mapped[str] = mapped_column(String(255), primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(255), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
+    item_id: Mapped[str] = mapped_column(String(255), ForeignKey("items.item_id", ondelete="CASCADE"), nullable=False)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    effects: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    activated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    user: Mapped["User"] = relationship("User", back_populates="active_items")
+    item: Mapped["Item"] = relationship("Item")
+
+
+class SlotMachineLog(Base):
+    __tablename__: str = "slot_machine_logs"
+
+    log_id: Mapped[str] = mapped_column(String(255), primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(255), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
+    bet_amount: Mapped[int] = mapped_column(Integer, nullable=False)
+    payout: Mapped[int] = mapped_column(Integer, nullable=False)
+    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    user: Mapped["User"] = relationship("User")
+
+
+

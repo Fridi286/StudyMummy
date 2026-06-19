@@ -30,6 +30,8 @@ class UserResponse(BaseModel):
     last_name: str
     email: EmailStr
     coins: int
+    experience: int
+    level: int
     avatar_url: str | None = None
 
     model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)

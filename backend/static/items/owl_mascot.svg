@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="glass" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#f0d8ff" stop-opacity="0.2"/>
+    </linearGradient>
+
+    <linearGradient id="owlGlow" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFD700"/>
+      <stop offset="100%" stop-color="#FF8C00"/>
+    </linearGradient>
+
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="5" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Orb Glow -->
+  <circle cx="128" cy="128" r="75" fill="#d18cff" opacity="0.3" filter="url(#glow)"/>
+
+  <!-- Base -->
+  <path d="M98 200 L158 200 L168 220 L88 220 Z" fill="#b37a3f" stroke="#3b2412" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M88 220 L168 220 L178 230 L78 230 Z" fill="#8a5a2c" stroke="#3b2412" stroke-width="5" stroke-linejoin="round"/>
+
+  <!-- Owl Inside (Simplified Cute Owl) -->
+  <g fill="url(#owlGlow)" filter="url(#glow)" opacity="0.9">
+    <!-- Owl Body -->
+    <rect x="108" y="110" width="40" height="50" rx="20"/>
+    <!-- Owl Ears -->
+    <polygon points="108,125 105,100 120,115"/>
+    <polygon points="148,125 151,100 136,115"/>
+  </g>
+  <!-- Owl details -->
+  <g fill="#2a2340">
+    <circle cx="118" cy="125" r="4"/>
+    <circle cx="138" cy="125" r="4"/>
+    <!-- Beak -->
+    <polygon points="128,135 125,130 131,130" fill="#ffffff"/>
+  </g>
+  <g fill="#ffffff" opacity="0.5">
+    <circle cx="128" cy="145" r="12"/>
+  </g>
+
+  <!-- Glass Orb -->
+  <circle cx="128" cy="128" r="70" fill="url(#glass)" stroke="#2a2340" stroke-width="6"/>
+
+  <!-- Orb Shine -->
+  <path d="M80 100 C80 65 110 65 130 65" fill="none" stroke="#ffffff" stroke-width="8" stroke-linecap="round" opacity="0.8"/>
+
+  <!-- Sparkles -->
+  <g stroke="#e2b6ff" stroke-width="4" stroke-linecap="round">
+    <path d="M48 64v10M43 69h10"/>
+    <path d="M208 80v10M203 85h10"/>
+    <path d="M195 196v8M191 200h8"/>
+  </g>
+
+  <!-- Tiny floating stars inside -->
+  <g fill="#ffffff" opacity="0.8">
+    <circle cx="98" cy="110" r="2.5" filter="url(#glow)"/>
+    <circle cx="158" cy="150" r="3" filter="url(#glow)"/>
+    <circle cx="148" cy="90" r="2" filter="url(#glow)"/>
+  </g>
+</svg>

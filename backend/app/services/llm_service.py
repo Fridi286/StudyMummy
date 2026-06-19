@@ -4,7 +4,7 @@ Zentrale Stelle für alle LLM-Interaktionen – leicht gegen ein anderes LLM aus
 """
 import json
 import time
-from typing import Optional, Iterable, cast
+from typing import Iterable, cast, Any
 from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletionMessageParam, ChatCompletionToolParam, ChatCompletionContentPartParam
 from app.core.config import get_settings
@@ -122,7 +122,7 @@ class LLMService:
                 f"response_preview={response_preview!r}"
             )
 
-            msg_dict: ChatCompletionMessageParam = assistant_msg.model_dump(exclude_none=True)  # type: ignore
+            msg_dict = cast(ChatCompletionMessageParam, cast(Any, assistant_msg.model_dump(exclude_none=True)))
             full_messages.append(msg_dict)
 
             if not assistant_msg.tool_calls:

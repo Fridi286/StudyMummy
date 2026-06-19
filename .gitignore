@@ -83,3 +83,6 @@ Thumbs.db
 # User Uploads
 backend/static/avatars/*
 !backend/static/avatars/.gitkeep
+
+# Generated WebP images (auto-converted from SVG)
+*.webp

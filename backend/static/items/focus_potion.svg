@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="glass" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#d8f3ff" stop-opacity="0.18"/>
+    </linearGradient>
+
+    <linearGradient id="potion" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#7AEEFF"/>
+      <stop offset="100%" stop-color="#1D85B9"/>
+    </linearGradient>
+
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Glow -->
+  <ellipse cx="128" cy="195" rx="55" ry="18" fill="#3cbeff" opacity="0.35" filter="url(#glow)"/>
+
+  <!-- Cork -->
+  <rect x="107" y="24" width="42" height="26" rx="4" fill="#b37a3f" stroke="#3b2412" stroke-width="4"/>
+  <path d="M112 30h32M112 38h32" stroke="#8a5a2c" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- Bottle neck -->
+  <rect x="98" y="46" width="60" height="40" rx="14" fill="url(#glass)" stroke="#2a2340" stroke-width="6"/>
+
+  <!-- Potion liquid -->
+  <path d="M70 122 Q70 196 128 206 Q186 196 186 122 Q186 118 182 118 L74 118 Q70 118 70 122Z" fill="url(#potion)"/>
+
+  <!-- Bottle -->
+  <path d="M98 82 L98 88 C98 96 92 104 82 114 C70 126 66 142 66 160 C66 196 92 222 128 222 C164 222 190 196 190 160 C190 142 186 126 174 114 C164 104 158 96 158 88 L158 82" fill="url(#glass)" stroke="#2a2340" stroke-width="6" stroke-linejoin="round"/>
+
+  <!-- Liquid surface -->
+  <path d="M74 118 Q128 130 182 118" fill="none" stroke="#b8ebff" stroke-width="4" stroke-linecap="round"/>
+
+  <!-- Bubbles -->
+  <g fill="#c0eeff" opacity="0.9">
+    <circle cx="100" cy="170" r="5"/>
+    <circle cx="116" cy="145" r="3"/>
+    <circle cx="145" cy="165" r="6"/>
+    <circle cx="160" cy="142" r="4"/>
+    <circle cx="128" cy="185" r="3"/>
+  </g>
+
+  <!-- Glass shine -->
+  <path d="M96 92 C78 114 76 176 98 196" fill="none" stroke="#ffffff" stroke-width="8" stroke-linecap="round" opacity="0.75"/>
+
+  <!-- Sparkles -->
+  <g stroke="#7acfff" stroke-width="4" stroke-linecap="round">
+    <path d="M58 74v10M53 79h10"/>
+    <path d="M198 60v10M193 65h10"/>
+    <path d="M205 116v8M201 120h8"/>
+  </g>
+
+  <!-- Tiny floating bubbles -->
+  <g fill="#b0eeff">
+    <circle cx="92" cy="68" r="3"/>
+    <circle cx="170" cy="50" r="2.5"/>
+    <circle cx="183" cy="78" r="2"/>
+  </g>
+</svg>

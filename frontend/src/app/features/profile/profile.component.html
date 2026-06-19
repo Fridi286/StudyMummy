@@ -42,13 +42,23 @@
         </div>
 
         <!-- Core Info -->
-        <div class="flex flex-col items-center md:items-start text-center md:text-left flex-1">
+        <div class="flex flex-col items-center md:items-start text-center md:text-left flex-1 w-full">
           <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight mb-1">
             {{ profileData()?.first_name }} {{ profileData()?.last_name }}
           </h1>
-          <p class="text-lg text-slate-500 font-medium flex items-center gap-2">
+          <p class="text-lg text-slate-500 font-medium flex items-center gap-2 mb-4">
             @{{ profileData()?.username }}
           </p>
+
+          <!-- Experience Bar -->
+          <div class="w-full max-w-lg mt-auto">
+            <div class="flex justify-between items-end mb-1.5">
+              <span class="text-sm font-extrabold text-slate-800">Level {{ profileData()?.level }}</span>
+              <span class="text-xs font-bold text-indigo-500">{{ expProgress }} / 100 XP</span>
+            </div>
+            <p-progressBar [value]="expProgress" [showValue]="false" styleClass="w-full h-2.5 rounded-full bg-slate-100 shadow-inner" color="#6366f1"></p-progressBar>
+            <p class="text-[10px] text-slate-400 mt-1 font-semibold uppercase tracking-wider">Total Exp: {{ profileData()?.experience }} XP</p>
+          </div>
         </div>
 
         <!-- Quick Stats & Actions -->

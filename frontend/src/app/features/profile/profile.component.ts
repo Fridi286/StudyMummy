@@ -14,6 +14,7 @@ import { FloatLabelModule } from 'primeng/floatlabel';
 import { ToastModule } from 'primeng/toast';
 import { FileUploadModule } from 'primeng/fileupload';
 import { DialogModule } from 'primeng/dialog';
+import { ProgressBarModule } from 'primeng/progressbar';
 import { MessageService } from 'primeng/api';
 import { ImageCropperComponent, ImageCroppedEvent, LoadedImage } from 'ngx-image-cropper';
 
@@ -24,7 +25,7 @@ import { ImageCropperComponent, ImageCroppedEvent, LoadedImage } from 'ngx-image
     CommonModule, FormsModule, CardModule, AvatarModule, ProgressSpinnerModule,
     BadgeModule, ButtonModule, InputTextModule, PasswordModule,
     FloatLabelModule, ToastModule, FileUploadModule, DialogModule,
-    ImageCropperComponent
+    ImageCropperComponent, ProgressBarModule
   ],
   providers: [MessageService],
   templateUrl: './profile.component.html'
@@ -81,6 +82,11 @@ export class ProfileComponent implements OnInit {
 
   get fullAvatarUrl(): string | null {
     return this.authService.cachedAvatarUrl();
+  }
+
+  get expProgress(): number {
+    const xp = this.profileData()?.experience || 0;
+    return xp % 100;
   }
 
   onAvatarSelect(event: any): void {

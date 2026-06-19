@@ -10,6 +10,8 @@ export interface UserResponse {
   last_name: string;
   email: string;
   coins: number;
+  experience: number;
+  level: number;
   avatar_url?: string;
   iat?: number;
 }
