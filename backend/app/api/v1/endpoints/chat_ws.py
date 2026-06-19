@@ -41,6 +41,15 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(...)):
     await manager.connect(user.user_id, websocket)
     user_data = cast(dict[str, str | int | None], UserPublic.model_validate(user).model_dump())
     
+    # Send current presence state to the newly connected user
+    try:
+        await websocket.send_json({
+            "type": "PRESENCE_STATE",
+            "message": manager.user_status
+        })
+    except Exception:
+        pass
+    
     try:
         while True:
             data_str = await websocket.receive_text()
@@ -50,6 +59,14 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(...)):
                 continue
                 
             msg_type = data.get("type")
+            
+            if msg_type == "PRESENCE_SET":
+                status = data.get("status")
+                if status in ["online", "away"]:
+                    manager.user_status[user.user_id] = status
+                    await manager.broadcast_presence(user.user_id, status)
+                continue
+                
             if msg_type == "CHAT_MESSAGE":
                 room_id = data.get("room_id")
                 content = data.get("content")
@@ -100,4 +117,4 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(...)):
                         await manager.send_personal_message(m.user_id, broadcast_msg)
                         
     except WebSocketDisconnect:
-        manager.disconnect(user.user_id, websocket)
+        await manager.disconnect(user.user_id, websocket)

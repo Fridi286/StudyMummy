@@ -1,0 +1,90 @@
+    <ng-container *ngIf="room; else noChatSelected">
+      
+      <!-- Chat Header -->
+      <div class="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+        <div class="flex items-center gap-3">
+          <ng-container *ngIf="getOtherMember() as other">
+            <div class="relative inline-block shrink-0">
+              <p-avatar [image]="other.avatar_url | avatarUrl" [label]="!other.avatar_url ? (other | initials) : undefined" shape="circle" size="large"></p-avatar>
+              <div class="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white"
+                   [ngClass]="{
+                     'bg-green-500': getPresence(other.user_id) === 'online',
+                     'bg-yellow-400': getPresence(other.user_id) === 'away',
+                     'bg-gray-400': getPresence(other.user_id) === 'offline'
+                   }">
+              </div>
+            </div>
+            <div>
+              <div class="font-semibold text-lg">{{other.first_name}} {{other.last_name}}</div>
+              <div class="text-sm text-gray-500">@{{other.username}}</div>
+            </div>
+          </ng-container>
+        </div>
+        <div *ngIf="getOtherMember() as other">
+          <p-button icon="pi pi-ellipsis-v" [rounded]="true" [text]="true" severity="secondary" (onClick)="chatMenu.toggle($event)"></p-button>
+          <p-menu #chatMenu [popup]="true" [model]="getChatMenuItems(other)"></p-menu>
+        </div>
+      </div>
+
+      <!-- Messages Area -->
+      <div #scrollContainer (scroll)="onScroll($event)" class="flex-1 overflow-y-auto p-4 flex flex-col gap-4 bg-gray-50/30">
+        
+        <!-- Loading History Indicator -->
+        <div *ngIf="isLoadingHistory" class="flex justify-center py-2">
+            <i class="pi pi-spinner pi-spin text-indigo-500 text-xl"></i>
+        </div>
+
+        <div *ngIf="chatMessages().length === 0 && !isLoadingHistory" class="flex-1 flex items-center justify-center text-gray-500">
+          Say hello!
+        </div>
+
+        <div *ngFor="let msg of chatMessages()" 
+             class="flex w-full"
+             [ngClass]="msg.sender_id === authService.currentUser()?.user_id ? 'justify-end' : 'justify-start'">
+          
+          <!-- Received Message -->
+          <div *ngIf="msg.sender_id !== authService.currentUser()?.user_id" class="flex gap-2 max-w-[70%]">
+            <p-avatar [image]="msg.sender.avatar_url | avatarUrl" [label]="!msg.sender.avatar_url ? (msg.sender | initials) : undefined" shape="circle" class="mt-1"></p-avatar>
+            <div class="bg-white border border-gray-200 text-gray-800 px-4 py-2 rounded-2xl rounded-tl-none shadow-sm">
+              {{msg.content}}
+            </div>
+          </div>
+
+          <!-- Sent Message -->
+          <div *ngIf="msg.sender_id === authService.currentUser()?.user_id" class="flex max-w-[70%]">
+            <div class="bg-indigo-600 text-white px-4 py-2 rounded-2xl rounded-tr-none shadow-sm">
+              {{msg.content}}
+            </div>
+          </div>
+          
+        </div>
+      </div>
+
+      <!-- Input Area -->
+      <div class="p-4 border-t border-gray-100 bg-white">
+        <form (ngSubmit)="sendMessage()" class="flex gap-2">
+          <input 
+            type="text" 
+            pInputText 
+            [(ngModel)]="messageContent" 
+            name="messageContent"
+            class="flex-1 w-full" 
+            placeholder="Type a message..." 
+            autocomplete="off">
+          <p-button 
+            type="submit" 
+            icon="pi pi-send" 
+            [disabled]="!messageContent.trim()"
+            [rounded]="true">
+          </p-button>
+        </form>
+      </div>
+
+    </ng-container>
+
+    <ng-template #noChatSelected>
+      <div class="flex-1 flex flex-col items-center justify-center text-gray-400 gap-4">
+        <i class="pi pi-comments text-6xl text-gray-300"></i>
+        <p class="text-lg">Select a friend to start chatting</p>
+      </div>
+    </ng-template>

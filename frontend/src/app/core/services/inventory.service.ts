@@ -50,6 +50,10 @@ export class InventoryService {
     return this.http.get<UserInventoryResponse>(this.baseUrl);
   }
 
+  getUserInventory(userId: string): Observable<UserInventoryResponse> {
+    return this.http.get<UserInventoryResponse>(`${this.baseUrl}/user/${userId}`);
+  }
+
   useItem(itemId: string): Observable<UseItemResponse> {
     return this.http.post<UseItemResponse>(`${this.baseUrl}/items/${itemId}/use`, {});
   }

@@ -28,19 +28,41 @@ class ConnectionManager:
         # Maps user_id to a set of active WebSocket connections
         # A user might be connected from multiple devices/tabs
         self.active_connections: dict[str, set[WebSocket]] = {}
+        self.user_status: dict[str, str] = {}
+
+    async def broadcast_presence(self, user_id: str, status: str):
+        message: WebSocketMessage = {
+            "type": "PRESENCE_UPDATE",
+            "user_id": user_id,
+            "message": status
+        }
+        for uid, connections in list(self.active_connections.items()):
+            for connection in list(connections):
+                try:
+                    await connection.send_json(message)
+                except Exception as e:
+                    log.warning(f"Failed to send presence update to {uid}: {e}")
 
     async def connect(self, user_id: str, websocket: WebSocket):
         await websocket.accept()
         if user_id not in self.active_connections:
             self.active_connections[user_id] = set()
         self.active_connections[user_id].add(websocket)
+        
+        # If this is their first connection, they are online
+        if user_id not in self.user_status or self.user_status.get(user_id) == "offline":
+            self.user_status[user_id] = "online"
+            await self.broadcast_presence(user_id, "online")
+            
         log.info(f"WebSocket connected for user {user_id}. Total connections for user: {len(self.active_connections[user_id])}")
 
-    def disconnect(self, user_id: str, websocket: WebSocket):
+    async def disconnect(self, user_id: str, websocket: WebSocket):
         if user_id in self.active_connections:
             self.active_connections[user_id].discard(websocket)
             if not self.active_connections[user_id]:
                 del self.active_connections[user_id]
+                self.user_status[user_id] = "offline"
+                await self.broadcast_presence(user_id, "offline")
             log.info(f"WebSocket disconnected for user {user_id}")
 
     async def send_personal_message(self, user_id: str, message: WebSocketMessage):
@@ -52,7 +74,7 @@ class ConnectionManager:
                     await connection.send_json(message)
                 except Exception as e:
                     log.warning(f"Failed to send personal message to {user_id}: {e}")
-                    self.disconnect(user_id, connection)
+                    await self.disconnect(user_id, connection)
 
 
 manager = ConnectionManager()

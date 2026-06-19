@@ -21,11 +21,17 @@ export class ChatService {
 
   public connected = signal<boolean>(false);
   
+  // Presence mapping: user_id -> 'online' | 'away' | 'offline'
+  public userPresence = signal<Record<string, string>>({});
+  
   // A signal to hold the latest incoming message
   public latestMessage = signal<ChatMessageResponse | null>(null);
   
   // A signal to hold the latest notification (e.g. FRIEND_REQUEST)
   public latestNotification = signal<any | null>(null);
+  
+  // A signal to trigger trade refreshes
+  public latestTradeUpdate = signal<number>(0);
 
   constructor() {
     effect(() => {
@@ -60,11 +66,20 @@ export class ChatService {
 
     this.ws.onmessage = (event) => {
       try {
-        const data: WebSocketMessage = JSON.parse(event.data);
+        const data = JSON.parse(event.data);
         if (data.type === 'CHAT_MESSAGE' && data.message) {
           this.latestMessage.set(data.message);
         } else if (data.type === 'FRIEND_REQUEST' || data.type === 'FRIEND_ACCEPTED') {
           this.latestNotification.set(data);
+        } else if (data.type === 'TRADE_UPDATE') {
+          this.latestTradeUpdate.update(v => v + 1);
+        } else if (data.type === 'PRESENCE_STATE') {
+          this.userPresence.set(data.message || {});
+        } else if (data.type === 'PRESENCE_UPDATE') {
+          this.userPresence.update(prev => ({
+            ...prev,
+            [data.user_id]: data.message
+          }));
         }
       } catch (e) {
         console.error('Failed to parse WebSocket message', e);
@@ -96,6 +111,15 @@ export class ChatService {
       }));
     } else {
       console.error('WebSocket is not connected');
+    }
+  }
+
+  public setStatus(status: 'online' | 'away') {
+    if (this.ws && this.connected()) {
+      this.ws.send(JSON.stringify({
+        type: 'PRESENCE_SET',
+        status: status
+      }));
     }
   }
 }

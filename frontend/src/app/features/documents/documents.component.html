@@ -1,0 +1,108 @@
+<p-toast></p-toast>
+<div class="min-h-screen bg-slate-50 pt-8 pb-12 px-4 sm:px-6 lg:px-8">
+  <div class="max-w-6xl mx-auto">
+    <!-- Header Area -->
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+      <div>
+        <h1 class="text-3xl font-extrabold text-slate-800 tracking-tight">Your Documents</h1>
+        <p class="text-slate-500 mt-1">Upload, manage, and download your study materials.</p>
+      </div>
+    </div>
+
+    <!-- Upload Area -->
+    <div class="mb-8">
+      <p-card styleClass="shadow-sm border border-slate-200 rounded-xl overflow-hidden">
+        <h2 class="text-lg font-bold text-slate-700 mb-4">Upload New Document</h2>
+        <p-fileupload 
+          #fileUpload
+          name="file" 
+          [customUpload]="true" 
+          (uploadHandler)="onUpload($event, fileUpload)" 
+          [multiple]="false" 
+          maxFileSize="5242880"
+          uploadLabel="Upload"
+          cancelLabel="Clear"
+          chooseLabel="Browse Files">
+            <ng-template pTemplate="empty">
+                <div class="flex flex-col items-center justify-center p-8 border-2 border-dashed border-slate-200 rounded-lg bg-slate-50 text-slate-400">
+                    <i class="pi pi-cloud-upload text-4xl mb-3 text-indigo-400"></i>
+                    <p class="font-medium">Drag and drop a file to here to upload.</p>
+                    <p class="text-xs mt-1">Maximum file size: 5MB.</p>
+                </div>
+            </ng-template>
+            <ng-template pTemplate="file" let-file>
+                <div class="flex items-center justify-between p-3 border border-slate-100 rounded-lg bg-slate-50 mb-2 w-full">
+                    <div class="flex items-center gap-3 overflow-hidden">
+                        <div class="w-10 h-10 bg-white rounded flex items-center justify-center shadow-sm border border-slate-200 flex-shrink-0">
+                            <i class="pi pi-file text-xl text-indigo-500"></i>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <p class="font-bold text-sm text-slate-700 truncate">{{file.name}}</p>
+                            <p class="text-xs font-medium text-slate-500">{{ (file.size / 1024).toFixed(1) }} KB</p>
+                        </div>
+                    </div>
+                    <p-button icon="pi pi-times" [text]="true" [rounded]="true" severity="danger" (onClick)="fileUpload.remove($event, fileUpload.files.indexOf(file))"></p-button>
+                </div>
+            </ng-template>
+        </p-fileupload>
+      </p-card>
+    </div>
+
+    <!-- Documents Grid -->
+    <div>
+      <h2 class="text-xl font-bold text-slate-800 mb-4 border-b border-slate-200 pb-2">My Files</h2>
+      
+      @if (isLoading()) {
+        <div class="flex justify-center p-12">
+            <i class="pi pi-spin pi-spinner text-4xl text-indigo-500"></i>
+        </div>
+      } @else if (documents().length === 0) {
+        <div class="text-center p-12 bg-white rounded-xl border border-slate-200 shadow-sm">
+          <i class="pi pi-folder-open text-5xl text-slate-300 mb-4"></i>
+          <h3 class="text-lg font-medium text-slate-600">No documents yet</h3>
+          <p class="text-slate-400 mt-1">Upload your first document above to get started.</p>
+        </div>
+      } @else {
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          @for (doc of documents(); track doc.document_id) {
+            <p-card styleClass="h-full shadow-sm hover:shadow-md transition-shadow duration-200 border border-slate-200 rounded-xl">
+              <div class="flex items-start gap-4">
+                <div class="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center flex-shrink-0 shadow-inner">
+                  <i class="pi pi-file text-2xl"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <h3 class="text-base font-bold text-slate-800 truncate" [title]="doc.file_name">
+                    {{ doc.file_name }}
+                  </h3>
+                  <p class="text-xs text-slate-500 mt-1">
+                    Uploaded: {{ doc.uploaded_at | date:'mediumDate' }}
+                  </p>
+                </div>
+              </div>
+              <ng-template pTemplate="footer">
+                <div class="flex justify-end pt-2 border-t border-slate-100 gap-2">
+                  <p-button 
+                    label="Download" 
+                    icon="pi pi-download" 
+                    size="small"
+                    severity="secondary"
+                    [outlined]="true"
+                    (onClick)="downloadDocument(doc)">
+                  </p-button>
+                  <p-button 
+                    icon="pi pi-trash" 
+                    size="small"
+                    severity="danger"
+                    [outlined]="true"
+                    title="Delete"
+                    (onClick)="deleteDocument(doc)">
+                  </p-button>
+                </div>
+              </ng-template>
+            </p-card>
+          }
+        </div>
+      }
+    </div>
+  </div>
+</div>

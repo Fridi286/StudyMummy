@@ -1,0 +1,238 @@
+<!-- Search Bar -->
+<div class="card bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+  <h3 class="text-lg font-semibold mb-3">Add Friends</h3>
+  <p-autoComplete [(ngModel)]="searchQuery" [suggestions]="searchResults()" (completeMethod)="searchUsers($event)"
+    (onSelect)="onUserSelect($event)" field="username" placeholder="Search username..." styleClass="w-full"
+    [inputStyle]="{'width': '100%'}">
+    <ng-template let-user pTemplate="item">
+      <div class="flex items-center justify-between w-full">
+        <div class="flex items-center gap-3">
+          <p-avatar [image]="user.avatar_url | avatarUrl" [label]="!user.avatar_url ? (user | initials) : undefined"
+            shape="circle"></p-avatar>
+          <div>
+            <div class="font-medium">{{user.username}}</div>
+            <div class="text-sm text-gray-500">{{user.first_name}} {{user.last_name}}</div>
+          </div>
+        </div>
+        <p-button icon="pi pi-user-plus" [rounded]="true" [text]="true" size="small"
+          (onClick)="sendFriendRequest(user); $event.stopPropagation()"></p-button>
+      </div>
+    </ng-template>
+  </p-autoComplete>
+</div>
+
+<!-- Pending Requests -->
+<div class="card bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col shrink-0"
+  *ngIf="pendingRequests().length > 0">
+  <h3 class="text-md font-semibold p-3 border-b border-gray-100">Pending Requests</h3>
+  <div class="overflow-y-auto max-h-48">
+    <div *ngFor="let req of pendingRequests()"
+      class="flex items-center justify-between p-3 hover:bg-gray-50 border-b border-gray-50">
+      <div class="flex items-center gap-2">
+        <div class="relative inline-block">
+          <p-avatar [image]="req.friend.avatar_url | avatarUrl"
+            [label]="!req.friend.avatar_url ? (req.friend | initials) : undefined" shape="circle"></p-avatar>
+          <div class="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border border-white" [ngClass]="{
+                         'bg-green-500': getPresence(req.friend.user_id) === 'online',
+                         'bg-yellow-400': getPresence(req.friend.user_id) === 'away',
+                         'bg-gray-400': getPresence(req.friend.user_id) === 'offline'
+                       }">
+          </div>
+        </div>
+        <div class="text-sm font-medium">{{req.friend.username}}</div>
+      </div>
+      <div class="flex gap-1">
+        <p-button icon="pi pi-check" [rounded]="true" [text]="true" severity="success" size="small"
+          (onClick)="acceptRequest(req)"></p-button>
+        <p-button icon="pi pi-times" [rounded]="true" [text]="true" severity="danger" size="small"
+          (onClick)="declineRequest(req)"></p-button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Pending Trades -->
+<div class="card bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col shrink-0"
+  *ngIf="pendingTrades().length > 0">
+  <h3 class="text-md font-semibold p-3 border-b border-gray-100 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors" (click)="toggleTradesSection()">
+    <div class="flex items-center gap-2">
+      <span>Pending Trades</span>
+      <span class="bg-indigo-100 text-indigo-700 text-xs font-bold px-2 py-0.5 rounded-full">{{pendingTrades().length}}</span>
+    </div>
+    <i class="pi text-gray-400 text-sm" [ngClass]="tradesSectionExpanded() ? 'pi-chevron-up' : 'pi-chevron-down'"></i>
+  </h3>
+  <div class="overflow-y-auto max-h-60 custom-scrollbar" *ngIf="tradesSectionExpanded()">
+    <div *ngFor="let trade of pendingTrades()">
+
+      <!-- Outgoing Trade -->
+      <div *ngIf="trade.sender_id === authService.currentUser()?.user_id"
+        class="p-3 border-b border-indigo-50 bg-indigo-50/30 hover:bg-indigo-50/80 transition-colors">
+        <div class="flex items-center gap-3 mb-3">
+          <div class="relative">
+            <p-avatar [image]="trade.receiver.avatar_url | avatarUrl"
+              [label]="!trade.receiver.avatar_url ? (trade.receiver | initials) : undefined" shape="circle"></p-avatar>
+            <div class="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5 shadow-sm"><i
+                class="pi pi-arrow-up-right text-indigo-500 text-[8px] font-bold"></i></div>
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="font-bold text-gray-800 text-sm truncate">To: {{trade.receiver.username}}</div>
+            <div class="flex items-center gap-2 mt-0.5">
+              <span
+                class="text-[11px] font-semibold text-indigo-600 bg-indigo-100/50 px-1.5 py-0.5 rounded-md flex items-center gap-1"><i
+                  class="pi pi-minus-circle text-[10px]"></i> {{trade.sender_coins}}</span>
+              <i class="pi pi-arrows-h text-gray-300 text-[10px]"></i>
+              <span
+                class="text-[11px] font-semibold text-emerald-600 bg-emerald-100/50 px-1.5 py-0.5 rounded-md flex items-center gap-1"><i
+                  class="pi pi-plus-circle text-[10px]"></i> {{trade.receiver_coins}}</span>
+            </div>
+
+            <div *ngIf="getOfferedItems(trade).length > 0 || getRequestedItems(trade).length > 0"
+              class="flex items-start gap-2 mt-2 pt-2 border-t border-indigo-100/50 text-[10px]">
+              <div *ngIf="getOfferedItems(trade).length > 0" class="flex-1">
+                <span class="text-indigo-500 font-bold mb-1 block">Items Offered:</span>
+                <div class="flex flex-wrap gap-1">
+                  <span *ngFor="let i of getOfferedItems(trade)"
+                    class="bg-white px-1.5 py-0.5 rounded shadow-sm border border-indigo-100 truncate max-w-full text-indigo-800 font-medium flex items-center gap-1"
+                    [title]="i.item.name">
+                    <img *ngIf="i.item.icon_url" [src]="'http://localhost:8000' + i.item.icon_url"
+                      class="w-3 h-3 object-contain">
+                    {{i.quantity}}x {{i.item.name}}
+                  </span>
+                </div>
+              </div>
+              <div *ngIf="getRequestedItems(trade).length > 0" class="flex-1">
+                <span class="text-emerald-500 font-bold mb-1 block">Items Requested:</span>
+                <div class="flex flex-wrap gap-1">
+                  <span *ngFor="let i of getRequestedItems(trade)"
+                    class="bg-white px-1.5 py-0.5 rounded shadow-sm border border-emerald-100 truncate max-w-full text-emerald-800 font-medium flex items-center gap-1"
+                    [title]="i.item.name">
+                    <img *ngIf="i.item.icon_url" [src]="'http://localhost:8000' + i.item.icon_url"
+                      class="w-3 h-3 object-contain">
+                    {{i.quantity}}x {{i.item.name}}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="flex justify-end mt-1">
+          <p-button icon="pi pi-times" label="Cancel Proposal" [text]="true" severity="danger" size="small"
+            styleClass="py-1 px-3 text-xs rounded-lg font-bold hover:bg-red-50"
+            (onClick)="cancelTrade(trade)"></p-button>
+        </div>
+      </div>
+
+      <!-- Incoming Trade -->
+      <div *ngIf="trade.receiver_id === authService.currentUser()?.user_id"
+        class="p-3 border-b border-emerald-50 bg-emerald-50/30 hover:bg-emerald-50/80 transition-colors">
+        <div class="flex items-center gap-3 mb-3">
+          <div class="relative">
+            <p-avatar [image]="trade.sender.avatar_url | avatarUrl"
+              [label]="!trade.sender.avatar_url ? (trade.sender | initials) : undefined" shape="circle"></p-avatar>
+            <div class="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5 shadow-sm"><i
+                class="pi pi-arrow-down-left text-emerald-500 text-[8px] font-bold"></i></div>
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="font-bold text-gray-800 text-sm truncate">From: {{trade.sender.username}}</div>
+            <div class="flex items-center gap-2 mt-0.5">
+              <span
+                class="text-[11px] font-semibold text-emerald-600 bg-emerald-100/50 px-1.5 py-0.5 rounded-md flex items-center gap-1"><i
+                  class="pi pi-plus-circle text-[10px]"></i> {{trade.sender_coins}}</span>
+              <i class="pi pi-arrows-h text-gray-300 text-[10px]"></i>
+              <span
+                class="text-[11px] font-semibold text-indigo-600 bg-indigo-100/50 px-1.5 py-0.5 rounded-md flex items-center gap-1"><i
+                  class="pi pi-minus-circle text-[10px]"></i> {{trade.receiver_coins}}</span>
+            </div>
+
+            <div *ngIf="getOfferedItems(trade).length > 0 || getRequestedItems(trade).length > 0"
+              class="flex items-start gap-2 mt-2 pt-2 border-t border-emerald-100/50 text-[10px]">
+              <div *ngIf="getOfferedItems(trade).length > 0" class="flex-1">
+                <span class="text-emerald-500 font-bold mb-1 block">Items Offered:</span>
+                <div class="flex flex-wrap gap-1">
+                  <span *ngFor="let i of getOfferedItems(trade)"
+                    class="bg-white px-1.5 py-0.5 rounded shadow-sm border border-emerald-100 truncate max-w-full text-emerald-800 font-medium flex items-center gap-1"
+                    [title]="i.item.name">
+                    <img *ngIf="i.item.icon_url" [src]="'http://localhost:8000' + i.item.icon_url"
+                      class="w-3 h-3 object-contain">
+                    {{i.quantity}}x {{i.item.name}}
+                  </span>
+                </div>
+              </div>
+              <div *ngIf="getRequestedItems(trade).length > 0" class="flex-1">
+                <span class="text-indigo-500 font-bold mb-1 block">Items Requested:</span>
+                <div class="flex flex-wrap gap-1">
+                  <span *ngFor="let i of getRequestedItems(trade)"
+                    class="bg-white px-1.5 py-0.5 rounded shadow-sm border border-indigo-100 truncate max-w-full text-indigo-800 font-medium flex items-center gap-1"
+                    [title]="i.item.name">
+                    <img *ngIf="i.item.icon_url" [src]="'http://localhost:8000' + i.item.icon_url"
+                      class="w-3 h-3 object-contain">
+                    {{i.quantity}}x {{i.item.name}}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="flex gap-2 justify-end mt-1">
+          <p-button icon="pi pi-times" label="Reject" [text]="true" severity="danger" size="small"
+            styleClass="py-1 px-3 text-xs rounded-lg font-bold hover:bg-red-50"
+            (onClick)="rejectTrade(trade)"></p-button>
+          <p-button icon="pi pi-check" label="Accept" severity="success" size="small"
+            styleClass="py-1 px-3 text-xs rounded-lg font-bold shadow-sm" (onClick)="acceptTrade(trade)"></p-button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Outgoing Requests -->
+<div class="card bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col shrink-0"
+  *ngIf="pendingOutgoing().length > 0">
+  <h3 class="text-md font-semibold p-3 border-b border-gray-100 text-gray-500">Sent Requests</h3>
+  <div class="overflow-y-auto max-h-48">
+    <div *ngFor="let req of pendingOutgoing()"
+      class="flex items-center justify-between p-3 hover:bg-gray-50 border-b border-gray-50">
+      <div class="flex items-center gap-2">
+        <p-avatar [image]="req.friend.avatar_url | avatarUrl"
+          [label]="!req.friend.avatar_url ? (req.friend | initials) : undefined" shape="circle"></p-avatar>
+        <div class="text-sm font-medium text-gray-500">{{req.friend.username}}</div>
+      </div>
+      <span class="text-xs text-gray-400 italic">Pending</span>
+    </div>
+  </div>
+</div>
+
+<!-- Friends List / Chatrooms -->
+<div class="card bg-white flex-1 rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col">
+  <h3 class="text-lg font-semibold p-4 border-b border-gray-100">Direct Messages</h3>
+  <div class="flex-1 overflow-y-auto">
+    <div *ngIf="chatrooms().length === 0" class="p-6 text-center text-gray-500">
+      No active chats yet.
+    </div>
+
+    <!-- Chatroom Items -->
+    <div *ngFor="let room of chatrooms()" (click)="selectChatroom(room)"
+      class="flex items-center gap-3 p-4 hover:bg-indigo-50 cursor-pointer transition-colors border-b border-gray-50"
+      [class.bg-indigo-50]="activeRoomId === room.room_id">
+
+      <ng-container *ngIf="getOtherMember(room) as other">
+        <div class="relative inline-block shrink-0">
+          <p-avatar [image]="other.avatar_url | avatarUrl" [label]="!other.avatar_url ? (other | initials) : undefined"
+            shape="circle" size="large"></p-avatar>
+          <div class="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white" [ngClass]="{
+                     'bg-green-500': getPresence(other.user_id) === 'online',
+                     'bg-yellow-400': getPresence(other.user_id) === 'away',
+                     'bg-gray-400': getPresence(other.user_id) === 'offline'
+                   }">
+          </div>
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="font-medium text-gray-900 truncate">{{other.username}}</div>
+          <div class="text-sm text-gray-500 truncate">Click to chat</div>
+        </div>
+      </ng-container>
+
+    </div>
+  </div>
+</div>

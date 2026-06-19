@@ -1,175 +1,29 @@
 <div class="flex h-[calc(100vh-6rem)] w-full gap-4 max-w-7xl mx-auto p-4">
   
   <!-- Left Panel: Friends & Search -->
-  <div class="w-1/3 min-w-[300px] flex flex-col gap-4">
-    
-    <!-- Search Bar -->
-    <div class="card bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-      <h3 class="text-lg font-semibold mb-3">Add Friends</h3>
-      <p-autoComplete 
-        [(ngModel)]="searchQuery" 
-        [suggestions]="searchResults()" 
-        (completeMethod)="searchUsers($event)"
-        (onSelect)="onUserSelect($event)"
-        field="username" 
-        placeholder="Search username..."
-        styleClass="w-full"
-        [inputStyle]="{'width': '100%'}">
-        <ng-template let-user pTemplate="item">
-          <div class="flex items-center justify-between w-full">
-            <div class="flex items-center gap-3">
-              <p-avatar [image]="user.avatar_url | avatarUrl" [label]="!user.avatar_url ? (user | initials) : undefined" shape="circle"></p-avatar>
-              <div>
-                <div class="font-medium">{{user.username}}</div>
-                <div class="text-sm text-gray-500">{{user.first_name}} {{user.last_name}}</div>
-              </div>
-            </div>
-            <p-button icon="pi pi-user-plus" [rounded]="true" [text]="true" size="small" (onClick)="sendFriendRequest(user); $event.stopPropagation()"></p-button>
-          </div>
-        </ng-template>
-      </p-autoComplete>
-    </div>
-
-    <!-- Pending Requests -->
-    <div class="card bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col shrink-0" *ngIf="pendingRequests().length > 0">
-      <h3 class="text-md font-semibold p-3 border-b border-gray-100">Pending Requests</h3>
-      <div class="overflow-y-auto max-h-48">
-        <div *ngFor="let req of pendingRequests()" class="flex items-center justify-between p-3 hover:bg-gray-50 border-b border-gray-50">
-            <div class="flex items-center gap-2">
-                <p-avatar [image]="req.friend.avatar_url | avatarUrl" [label]="!req.friend.avatar_url ? (req.friend | initials) : undefined" shape="circle"></p-avatar>
-                <div class="text-sm font-medium">{{req.friend.username}}</div>
-            </div>
-            <div class="flex gap-1">
-                <p-button icon="pi pi-check" [rounded]="true" [text]="true" severity="success" size="small" (onClick)="acceptRequest(req)"></p-button>
-                <p-button icon="pi pi-times" [rounded]="true" [text]="true" severity="danger" size="small" (onClick)="declineRequest(req)"></p-button>
-            </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Outgoing Requests -->
-    <div class="card bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col shrink-0" *ngIf="pendingOutgoing().length > 0">
-      <h3 class="text-md font-semibold p-3 border-b border-gray-100 text-gray-500">Sent Requests</h3>
-      <div class="overflow-y-auto max-h-48">
-        <div *ngFor="let req of pendingOutgoing()" class="flex items-center justify-between p-3 hover:bg-gray-50 border-b border-gray-50">
-            <div class="flex items-center gap-2">
-                <p-avatar [image]="req.friend.avatar_url | avatarUrl" [label]="!req.friend.avatar_url ? (req.friend | initials) : undefined" shape="circle"></p-avatar>
-                <div class="text-sm font-medium text-gray-500">{{req.friend.username}}</div>
-            </div>
-            <span class="text-xs text-gray-400 italic">Pending</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Friends List / Chatrooms -->
-    <div class="card bg-white flex-1 rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col">
-      <h3 class="text-lg font-semibold p-4 border-b border-gray-100">Direct Messages</h3>
-      <div class="flex-1 overflow-y-auto">
-        <div *ngIf="chatrooms().length === 0" class="p-6 text-center text-gray-500">
-          No active chats yet.
-        </div>
-        
-        <!-- Chatroom Items -->
-        <div *ngFor="let room of chatrooms()" 
-             (click)="selectChatroom(room)"
-             class="flex items-center gap-3 p-4 hover:bg-indigo-50 cursor-pointer transition-colors border-b border-gray-50"
-             [class.bg-indigo-50]="activeChatroom()?.room_id === room.room_id">
-             
-          <ng-container *ngIf="getOtherMember(room) as other">
-            <p-avatar [image]="other.avatar_url | avatarUrl" [label]="!other.avatar_url ? (other | initials) : undefined" shape="circle" size="large"></p-avatar>
-            <div class="flex-1 min-w-0">
-              <div class="font-medium text-gray-900 truncate">{{other.username}}</div>
-              <div class="text-sm text-gray-500 truncate">Click to chat</div>
-            </div>
-          </ng-container>
-          
-        </div>
-      </div>
-    </div>
+  <div class="w-1/3 min-w-[300px] h-full">
+    <app-social-sidebar 
+      class="flex flex-col gap-5 h-full overflow-hidden"
+      [activeRoomId]="activeChatroom()?.room_id"
+      (roomSelected)="onRoomSelected($event)">
+    </app-social-sidebar>
   </div>
 
   <!-- Right Panel: Active Chat Interface -->
   <div class="flex-1 bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col overflow-hidden">
-    <ng-container *ngIf="activeChatroom() as room; else noChatSelected">
-      
-      <!-- Chat Header -->
-      <div class="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
-        <div class="flex items-center gap-3">
-          <ng-container *ngIf="getOtherMember(room) as other">
-            <p-avatar [image]="other.avatar_url | avatarUrl" [label]="!other.avatar_url ? (other | initials) : undefined" shape="circle" size="large"></p-avatar>
-            <div>
-              <div class="font-semibold text-lg">{{other.first_name}} {{other.last_name}}</div>
-              <div class="text-sm text-gray-500">@{{other.username}}</div>
-            </div>
-          </ng-container>
-        </div>
-        <div *ngIf="getOtherMember(room) as other">
-          <p-button icon="pi pi-ellipsis-v" [rounded]="true" [text]="true" severity="secondary" (onClick)="chatMenu.toggle($event)"></p-button>
-          <p-menu #chatMenu [popup]="true" [model]="getChatMenuItems(other)"></p-menu>
-        </div>
-      </div>
-
-      <!-- Messages Area -->
-      <div #scrollContainer (scroll)="onScroll($event)" class="flex-1 overflow-y-auto p-4 flex flex-col gap-4 bg-gray-50/30">
-        
-        <!-- Loading History Indicator -->
-        <div *ngIf="isLoadingHistory" class="flex justify-center py-2">
-            <i class="pi pi-spinner pi-spin text-indigo-500 text-xl"></i>
-        </div>
-
-        <div *ngIf="chatMessages().length === 0 && !isLoadingHistory" class="flex-1 flex items-center justify-center text-gray-500">
-          Say hello!
-        </div>
-
-        <div *ngFor="let msg of chatMessages()" 
-             class="flex w-full"
-             [ngClass]="msg.sender_id === authService.currentUser()?.user_id ? 'justify-end' : 'justify-start'">
-          
-          <!-- Received Message -->
-          <div *ngIf="msg.sender_id !== authService.currentUser()?.user_id" class="flex gap-2 max-w-[70%]">
-            <p-avatar [image]="msg.sender.avatar_url | avatarUrl" [label]="!msg.sender.avatar_url ? (msg.sender | initials) : undefined" shape="circle" class="mt-1"></p-avatar>
-            <div class="bg-white border border-gray-200 text-gray-800 px-4 py-2 rounded-2xl rounded-tl-none shadow-sm">
-              {{msg.content}}
-            </div>
-          </div>
-
-          <!-- Sent Message -->
-          <div *ngIf="msg.sender_id === authService.currentUser()?.user_id" class="flex max-w-[70%]">
-            <div class="bg-indigo-600 text-white px-4 py-2 rounded-2xl rounded-tr-none shadow-sm">
-              {{msg.content}}
-            </div>
-          </div>
-          
-        </div>
-      </div>
-
-      <!-- Input Area -->
-      <div class="p-4 border-t border-gray-100 bg-white">
-        <form (ngSubmit)="sendMessage()" class="flex gap-2">
-          <input 
-            type="text" 
-            pInputText 
-            [(ngModel)]="messageContent" 
-            name="messageContent"
-            class="flex-1 w-full" 
-            placeholder="Type a message..." 
-            autocomplete="off">
-          <p-button 
-            type="submit" 
-            icon="pi pi-send" 
-            [disabled]="!messageContent.trim()"
-            [rounded]="true">
-          </p-button>
-        </form>
-      </div>
-
-    </ng-container>
-
-    <ng-template #noChatSelected>
-      <div class="flex-1 flex flex-col items-center justify-center text-gray-400 gap-4">
-        <i class="pi pi-comments text-6xl text-gray-300"></i>
-        <p class="text-lg">Select a friend to start chatting</p>
-      </div>
-    </ng-template>
+    <app-chat-window 
+      class="flex flex-col h-full"
+      [room]="activeChatroom()" 
+      (openTrade)="openTradeModal($event)"
+      (removeFriend)="onRemoveFriend($event)">
+    </app-chat-window>
   </div>
 </div>
+
+<!-- Trade Dialog -->
+<app-trade-dialog 
+  [visible]="displayTradeModal()"
+  (visibleChange)="displayTradeModal.set($event)"
+  [targetUser]="tradeFriend()"
+  (tradeProposed)="onTradeProposed()">
+</app-trade-dialog>

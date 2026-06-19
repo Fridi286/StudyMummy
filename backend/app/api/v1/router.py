@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.v1.endpoints import auth, agent, tasks, memory, social, chat_ws, inventory, shop, gambling
+from app.api.v1.endpoints import auth, agent, tasks, memory, social, chat_ws, inventory, shop, gambling, documents, economy
 
 api_router = APIRouter(prefix="/api/v1")
 
@@ -11,4 +11,6 @@ api_router.include_router(social.router, prefix="/social", tags=["social"])
 api_router.include_router(inventory.router, prefix="/inventory", tags=["inventory"])
 api_router.include_router(shop.router, prefix="/shop", tags=["Shop"])
 api_router.include_router(gambling.router, prefix="/gambling", tags=["Gambling"])
+api_router.include_router(documents.router, prefix="/documents", tags=["documents"])
+api_router.include_router(economy.router, prefix="/economy", tags=["economy"])
 api_router.include_router(chat_ws.router, tags=["chat_ws"])

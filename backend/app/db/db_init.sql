@@ -205,3 +205,24 @@ CREATE TABLE IF NOT EXISTS slot_machine_logs (
     timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 22. Trades Table
+CREATE TABLE IF NOT EXISTS trades (
+    trade_id VARCHAR(255) PRIMARY KEY,
+    sender_id VARCHAR(255) NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    receiver_id VARCHAR(255) NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    sender_coins INT NOT NULL DEFAULT 0 CHECK (sender_coins >= 0),
+    receiver_coins INT NOT NULL DEFAULT 0 CHECK (receiver_coins >= 0),
+    status VARCHAR(50) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'rejected', 'cancelled')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CHECK (sender_id != receiver_id)
+);
+
+-- 23. Trade Items Table
+CREATE TABLE IF NOT EXISTS trade_items (
+    trade_item_id VARCHAR(255) PRIMARY KEY,
+    trade_id VARCHAR(255) NOT NULL REFERENCES trades(trade_id) ON DELETE CASCADE,
+    owner_id VARCHAR(255) NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    item_id VARCHAR(255) NOT NULL REFERENCES items(item_id) ON DELETE CASCADE,
+    quantity INT NOT NULL DEFAULT 1 CHECK (quantity > 0)
+);

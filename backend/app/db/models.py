@@ -248,4 +248,34 @@ class SlotMachineLog(Base):
     user: Mapped["User"] = relationship("User")
 
 
+class Trade(Base):
+    __tablename__: str = "trades"
+
+    trade_id: Mapped[str] = mapped_column(String(255), primary_key=True)
+    sender_id: Mapped[str] = mapped_column(String(255), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
+    receiver_id: Mapped[str] = mapped_column(String(255), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
+    sender_coins: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    receiver_coins: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    status: Mapped[str] = mapped_column(String(50), default="pending", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    sender: Mapped["User"] = relationship("User", foreign_keys=[sender_id])
+    receiver: Mapped["User"] = relationship("User", foreign_keys=[receiver_id])
+    trade_items: Mapped[list["TradeItem"]] = relationship("TradeItem", back_populates="trade", cascade="all, delete-orphan")
+
+
+class TradeItem(Base):
+    __tablename__: str = "trade_items"
+
+    trade_item_id: Mapped[str] = mapped_column(String(255), primary_key=True)
+    trade_id: Mapped[str] = mapped_column(String(255), ForeignKey("trades.trade_id", ondelete="CASCADE"), nullable=False)
+    owner_id: Mapped[str] = mapped_column(String(255), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
+    item_id: Mapped[str] = mapped_column(String(255), ForeignKey("items.item_id", ondelete="CASCADE"), nullable=False)
+    quantity: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+
+    trade: Mapped["Trade"] = relationship("Trade", back_populates="trade_items")
+    owner: Mapped["User"] = relationship("User", foreign_keys=[owner_id])
+    item: Mapped["Item"] = relationship("Item")
+
 

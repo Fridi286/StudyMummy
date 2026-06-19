@@ -4,73 +4,108 @@
     <div class="flex justify-between h-16 items-center">
       <div class="flex-shrink-0 flex items-center gap-4">
         <a routerLink="/" class="text-xl font-bold text-indigo-600 tracking-tight">StudyMummy</a>
-        
+
         <!-- Clock -->
         @if (!isCasinoPage()) {
-          <div class="text-slate-400 font-medium hidden sm:flex items-center gap-1.5 text-sm border-l border-slate-200 pl-4 ml-2">
-            <i class="pi pi-clock"></i>
-            {{ currentTime() | date:'shortTime' }}
-          </div>
+        <div
+          class="text-slate-400 font-medium hidden sm:flex items-center gap-1.5 text-sm border-l border-slate-200 pl-4 ml-2">
+          <i class="pi pi-clock"></i>
+          {{ currentTime() | date:'shortTime' }}
+        </div>
         }
       </div>
       <div class="flex items-center gap-4">
-        
+
+
         <!-- Casino Link -->
-        <a routerLink="/casino" class="flex items-center gap-2 text-gray-500 hover:text-indigo-600 font-medium transition-colors cursor-pointer mr-2">
+        <a routerLink="/casino"
+          routerLinkActive="!text-indigo-600 bg-indigo-50/80 px-3 py-1.5 -mx-3 -my-1.5 rounded-xl"
+          class="flex items-center gap-2 text-gray-500 hover:text-indigo-600 font-medium transition-all cursor-pointer mr-2">
           <i class="pi pi-ticket text-xl"></i>
           <span class="hidden sm:inline">Casino</span>
         </a>
-        
+
         <!-- AI Chat Link -->
-        <a routerLink="/ai-chat" class="flex items-center gap-2 text-gray-500 hover:text-indigo-600 font-medium transition-colors cursor-pointer mr-2">
+        <a routerLink="/ai-chat"
+          routerLinkActive="!text-indigo-600 bg-indigo-50/80 px-3 py-1.5 -mx-3 -my-1.5 rounded-xl"
+          class="flex items-center gap-2 text-gray-500 hover:text-indigo-600 font-medium transition-all cursor-pointer mr-2">
           <i class="pi pi-sparkles text-xl"></i>
           <span class="hidden sm:inline">AI Tutor</span>
         </a>
 
+        <!-- Learn Link -->
+        <a routerLink="/learn"
+          routerLinkActive="!text-indigo-600 bg-indigo-50/80 px-3 py-1.5 -mx-3 -my-1.5 rounded-xl"
+          class="flex items-center gap-2 text-gray-500 hover:text-indigo-600 font-medium transition-all cursor-pointer mr-2">
+          <i class="pi pi-book text-xl"></i>
+          <span class="hidden sm:inline">Learn</span>
+        </a>
+
         <!-- Social Link -->
-        <a routerLink="/social" class="flex items-center gap-2 text-gray-500 hover:text-indigo-600 font-medium transition-colors cursor-pointer mr-2">
+        <a routerLink="/social"
+          routerLinkActive="!text-indigo-600 bg-indigo-50/80 px-3 py-1.5 -mx-3 -my-1.5 rounded-xl"
+          class="flex items-center gap-2 text-gray-500 hover:text-indigo-600 font-medium transition-all cursor-pointer mr-2">
           <i class="pi pi-users text-xl"></i>
           <span class="hidden sm:inline">Social</span>
         </a>
 
+        <!-- Shop Link -->
+        <a routerLink="/shop"
+          routerLinkActive="!text-indigo-600 bg-indigo-50/80 px-3 py-1.5 -mx-3 -my-1.5 rounded-xl"
+          class="flex items-center gap-2 text-gray-500 hover:text-indigo-600 font-medium transition-all cursor-pointer mr-2">
+          <i class="pi pi-shopping-cart text-xl"></i>
+          <span class="hidden sm:inline">Shop</span>
+        </a>
+
         <!-- Notification Bell -->
         <i class="pi pi-bell text-xl text-gray-500 cursor-pointer hover:text-indigo-600 transition-colors relative"
-           (click)="op.toggle($event)">
-           <p-badge *ngIf="pendingRequests().length > 0" [value]="pendingRequests().length" severity="danger" styleClass="absolute -top-2 -right-2"></p-badge>
+          (click)="op.toggle($event)">
+          <p-badge *ngIf="pendingRequests().length > 0" [value]="pendingRequests().length" severity="danger"
+            styleClass="absolute -top-2 -right-2"></p-badge>
         </i>
-        
+
         <p-popover #op appendTo="body">
-            <div class="w-80">
-                <h4 class="font-bold border-b pb-2 mb-2">Pending Friend Requests</h4>
-                <div *ngIf="pendingRequests().length === 0" class="text-sm text-gray-500 p-2 text-center">
-                    No pending requests.
-                </div>
-                <div *ngFor="let req of pendingRequests()" class="flex items-center justify-between p-2 hover:bg-gray-50 rounded">
-                    <div class="flex items-center gap-2">
-                        <p-avatar [image]="req.friend.avatar_url | avatarUrl" [label]="!req.friend.avatar_url ? (req.friend | initials) : undefined" shape="circle"></p-avatar>
-                        <span class="font-medium text-sm">{{req.friend.username}}</span>
-                    </div>
-                    <div class="flex gap-1">
-                        <p-button icon="pi pi-check" [rounded]="true" [text]="true" severity="success" size="small" (onClick)="acceptRequest(req)"></p-button>
-                        <p-button icon="pi pi-times" [rounded]="true" [text]="true" severity="danger" size="small" (onClick)="declineRequest(req)"></p-button>
-                    </div>
-                </div>
+          <div class="w-80">
+            <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-3 mb-2">Pending Requests</h4>
+            <div *ngIf="pendingRequests().length === 0" class="text-sm text-slate-500 p-4 text-center italic">
+              No pending requests.
             </div>
+            <div *ngFor="let req of pendingRequests()"
+              class="flex items-center justify-between p-2 hover:bg-gray-50 rounded">
+              <div class="flex items-center gap-2">
+                <p-avatar [image]="req.friend.avatar_url | avatarUrl"
+                  [label]="!req.friend.avatar_url ? (req.friend | initials) : undefined" shape="circle"></p-avatar>
+                <span class="font-medium text-sm">{{req.friend.username}}</span>
+              </div>
+              <div class="flex gap-1">
+                <p-button icon="pi pi-check" [rounded]="true" [text]="true" severity="success" size="small"
+                  (onClick)="acceptRequest(req)"></p-button>
+                <p-button icon="pi pi-times" [rounded]="true" [text]="true" severity="danger" size="small"
+                  (onClick)="declineRequest(req)"></p-button>
+              </div>
+            </div>
+          </div>
         </p-popover>
 
         <!-- User Menu -->
         <button (click)="userMenu.toggle($event)"
-          class="focus:outline-none hover:ring-2 hover:ring-indigo-500 hover:ring-offset-2 rounded-full transition-all ml-2">
+          class="relative focus:outline-none hover:ring-2 hover:ring-indigo-500 hover:ring-offset-2 rounded-full transition-all ml-2">
           @if (fullAvatarUrl()) {
-            <img 
-              [src]="fullAvatarUrl()" 
-              class="rounded-full object-cover shadow-sm border-2 border-indigo-100 bg-white"
-              style="width: 2.5rem; height: 2.5rem; min-width: 2.5rem; min-height: 2.5rem;"
-              alt="Avatar" />
+          <img [src]="fullAvatarUrl()" class="rounded-full object-cover shadow-sm border-2 border-indigo-100 bg-white"
+            style="width: 2.5rem; height: 2.5rem; min-width: 2.5rem; min-height: 2.5rem;" alt="Avatar" />
           } @else {
-            <p-avatar [label]="userInitials()" shape="circle"
-              styleClass="bg-indigo-600 text-white font-bold cursor-pointer" [style]="{'width': '2.5rem', 'height': '2.5rem'}"></p-avatar>
+          <p-avatar [label]="userInitials()" shape="circle"
+            styleClass="bg-indigo-600 text-white font-bold cursor-pointer"
+            [style]="{'width': '2.5rem', 'height': '2.5rem'}"></p-avatar>
           }
+          
+          <div class="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white"
+               [ngClass]="{
+                 'bg-green-500': myPresence === 'online',
+                 'bg-yellow-400': myPresence === 'away',
+                 'bg-gray-400': myPresence === 'offline'
+               }">
+          </div>
         </button>
         <p-menu #userMenu [model]="menuItems" [popup]="true" appendTo="body"></p-menu>
       </div>

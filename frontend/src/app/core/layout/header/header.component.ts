@@ -1,6 +1,6 @@
 import { Component, OnInit, OnDestroy, computed, inject, signal, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterLink, Router, NavigationEnd } from '@angular/router';
+import { RouterLink, RouterLinkActive, Router, NavigationEnd } from '@angular/router';
 import { filter } from 'rxjs/operators';
 import { AuthService } from '../../auth/auth.service';
 import { SocialService, FriendshipResponse } from '../../services/social.service';
@@ -18,7 +18,7 @@ import { InitialsPipe } from '../../../shared/pipes/initials.pipe';
   selector: 'app-header',
   standalone: true,
   imports: [
-    CommonModule, RouterLink, ButtonModule, MenuModule, AvatarModule, BadgeModule, PopoverModule,
+    CommonModule, RouterLink, RouterLinkActive, ButtonModule, MenuModule, AvatarModule, BadgeModule, PopoverModule,
     AvatarUrlPipe, InitialsPipe
   ],
   templateUrl: './header.component.html',
@@ -110,18 +110,35 @@ export class HeaderComponent implements OnInit, OnDestroy {
             routerLink: '/profile'
           },
           {
+            label: 'Documents',
+            icon: 'pi pi-file',
+            routerLink: '/documents'
+          },
+          {
             label: 'Inventory',
             icon: 'pi pi-box',
             routerLink: '/inventory'
+          }
+        ]
+      },
+      {
+        label: 'Status',
+        items: [
+          {
+            label: '<div class="flex items-center gap-2"><div class="w-2.5 h-2.5 rounded-full bg-green-500"></div><span>Set Online</span></div>',
+            escape: false,
+            command: () => this.chatService.setStatus('online')
           },
           {
-            label: 'Shop',
-            icon: 'pi pi-shopping-cart',
-            routerLink: '/shop'
-          },
-          {
-            separator: true
-          },
+            label: '<div class="flex items-center gap-2"><div class="w-2.5 h-2.5 rounded-full bg-yellow-500"></div><span>Set Away</span></div>',
+            escape: false,
+            command: () => this.chatService.setStatus('away')
+          }
+        ]
+      },
+      {
+        label: 'Actions',
+        items: [
           {
             label: 'Sign Out',
             icon: 'pi pi-sign-out',
@@ -130,6 +147,12 @@ export class HeaderComponent implements OnInit, OnDestroy {
         ]
       }
     ];
+  }
+
+  get myPresence(): string {
+    const user = this.authService.currentUser();
+    if (!user) return 'offline';
+    return this.chatService.userPresence()[user.user_id] || 'online'; // assume online if connected
   }
 
   loadPendingRequests() {

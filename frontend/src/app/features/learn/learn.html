@@ -1,0 +1,60 @@
+<div class="flex-1 w-full h-full bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-indigo-50 via-white to-slate-50 flex flex-col">
+  
+  <!-- Main Content Area -->
+  <div class="flex-1 p-4 sm:p-6 lg:p-10 w-full">
+    <div class="max-w-6xl mx-auto h-full flex flex-col">
+
+      <!-- Sleek Tabs Panel -->
+      <div class="bg-white/80 backdrop-blur-md rounded-2xl border border-slate-200/60 shadow-sm p-1.5 flex items-center w-full md:w-max mb-8 z-10 shrink-0">
+        <button (click)="setTab('quiz')" 
+                class="flex-1 md:flex-none px-6 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 flex justify-center items-center gap-2"
+                [ngClass]="activeTab() === 'quiz' ? 'bg-indigo-50 text-indigo-600 shadow-sm ring-1 ring-indigo-500/20 translate-y-0 scale-100' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100/50'">
+          <i class="pi pi-question-circle"></i> Quiz
+        </button>
+        <button (click)="setTab('tasks')" 
+                class="flex-1 md:flex-none px-6 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 flex justify-center items-center gap-2"
+                [ngClass]="activeTab() === 'tasks' ? 'bg-emerald-50 text-emerald-600 shadow-sm ring-1 ring-emerald-500/20 translate-y-0 scale-100' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100/50'">
+          <i class="pi pi-check-square"></i> Tasks
+        </button>
+        <button (click)="setTab('cheatsheets')" 
+                class="flex-1 md:flex-none px-6 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 flex justify-center items-center gap-2"
+                [ngClass]="activeTab() === 'cheatsheets' ? 'bg-amber-50 text-amber-600 shadow-sm ring-1 ring-amber-500/20 translate-y-0 scale-100' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100/50'">
+          <i class="pi pi-file"></i> Cheatsheets
+        </button>
+      </div>
+      
+      <!-- Sleek Empty States -->
+      <div class="flex-1 bg-white/80 backdrop-blur-md rounded-3xl border border-slate-200/60 shadow-xl p-10 flex flex-col items-center justify-center text-center relative overflow-hidden transition-all duration-500 ease-in-out min-h-[400px]">
+        
+        @if (activeTab() === 'quiz') {
+          <div class="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
+          <div class="w-28 h-28 bg-indigo-50 text-indigo-400 rounded-[2rem] flex items-center justify-center text-6xl mb-6 shadow-inner border-[6px] border-white z-10">
+            <i class="pi pi-question-circle"></i>
+          </div>
+          <h2 class="text-3xl font-extrabold text-slate-800 mb-3 z-10">Quiz Mode</h2>
+          <p class="text-xl text-slate-500 max-w-lg z-10">The quiz section is currently empty. Check back later for personalized study challenges!</p>
+        }
+
+        @if (activeTab() === 'tasks') {
+          <div class="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
+          <div class="w-28 h-28 bg-emerald-50 text-emerald-400 rounded-[2rem] flex items-center justify-center text-6xl mb-6 shadow-inner border-[6px] border-white z-10">
+            <i class="pi pi-check-square"></i>
+          </div>
+          <h2 class="text-3xl font-extrabold text-slate-800 mb-3 z-10">Study Tasks</h2>
+          <p class="text-xl text-slate-500 max-w-lg z-10">You're all caught up! Your assigned study tasks will appear here.</p>
+        }
+
+        @if (activeTab() === 'cheatsheets') {
+          <div class="absolute top-0 right-0 w-64 h-64 bg-amber-500/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
+          <div class="w-28 h-28 bg-amber-50 text-amber-400 rounded-[2rem] flex items-center justify-center text-6xl mb-6 shadow-inner border-[6px] border-white z-10">
+            <i class="pi pi-file"></i>
+          </div>
+          <h2 class="text-3xl font-extrabold text-slate-800 mb-3 z-10">Cheatsheets</h2>
+          <p class="text-xl text-slate-500 max-w-lg z-10">Quick reference guides and cheatsheets for your courses will be added here soon.</p>
+        }
+
+      </div>
+
+    </div>
+  </div>
+</div>

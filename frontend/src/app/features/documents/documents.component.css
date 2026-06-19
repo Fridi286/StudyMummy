@@ -1,0 +1,30 @@
+/* Custom styling for PrimeNG components to match the aesthetic */
+:host ::ng-deep .p-fileupload {
+    border: none;
+    background: transparent;
+}
+
+:host ::ng-deep .p-fileupload-buttonbar {
+    background: white;
+    border: none;
+    border-bottom: 1px solid #e2e8f0;
+    padding: 1rem;
+    border-top-left-radius: 0.75rem;
+    border-top-right-radius: 0.75rem;
+}
+
+:host ::ng-deep .p-fileupload-content {
+    background: white;
+    border: none;
+    padding: 1rem;
+    border-bottom-left-radius: 0.75rem;
+    border-bottom-right-radius: 0.75rem;
+}
+
+:host ::ng-deep .p-card .p-card-body {
+    padding: 1.25rem;
+}
+
+:host ::ng-deep .p-card .p-card-content {
+    padding: 0;
+}

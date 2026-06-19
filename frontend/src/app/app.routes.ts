@@ -9,6 +9,8 @@ import { AiChatComponent } from './features/ai-chat/ai-chat.component';
 import { InventoryComponent } from './features/inventory/inventory.component';
 import { ShopComponent } from './features/shop/shop.component';
 import { CasinoComponent } from './features/casino/casino.component';
+import { DocumentsComponent } from './features/documents/documents.component';
+import { Learn } from './features/learn/learn';
 
 export const routes: Routes = [
   { path: 'login', component: LoginComponent },
@@ -19,6 +21,8 @@ export const routes: Routes = [
   { path: 'inventory', component: InventoryComponent, canActivate: [authGuard] },
   { path: 'shop', component: ShopComponent, canActivate: [authGuard] },
   { path: 'casino', component: CasinoComponent, canActivate: [authGuard] },
+  { path: 'documents', component: DocumentsComponent, canActivate: [authGuard] },
+  { path: 'learn', component: Learn, canActivate: [authGuard] },
   { path: '', component: DashboardComponent, canActivate: [authGuard], pathMatch: 'full' },
   { path: '**', redirectTo: '' },
 ];

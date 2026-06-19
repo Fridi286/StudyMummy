@@ -46,6 +46,34 @@ async def get_inventory(
         active_items=[ActiveItemResponse.model_validate(act) for act in active_items]
     )
 
+@router.get("/user/{target_user_id}", response_model=UserInventoryResponse)
+async def get_user_inventory(
+    target_user_id: str,
+    db: Annotated[AsyncSession, Depends(get_async_db)],
+    current_user: Annotated[User, Depends(get_current_user)]
+):
+    # Fetch inventory items
+    stmt_inv = select(InventoryItem).options(joinedload(InventoryItem.item)).where(
+        (InventoryItem.user_id == target_user_id) &
+        (InventoryItem.quantity > 0)
+    )
+    result_inv = await db.execute(stmt_inv)
+    inventory_items = result_inv.scalars().all()
+
+    # Fetch active items
+    now = datetime.now(timezone.utc)
+    stmt_active = select(ActiveItem).options(joinedload(ActiveItem.item)).where(
+        (ActiveItem.user_id == target_user_id) &
+        ((ActiveItem.expires_at > now) | (ActiveItem.expires_at.is_(None)))
+    )
+    result_active = await db.execute(stmt_active)
+    active_items = result_active.scalars().all()
+
+    return UserInventoryResponse(
+        inventory=[InventoryItemResponse.model_validate(item) for item in inventory_items],
+        active_items=[ActiveItemResponse.model_validate(act) for act in active_items]
+    )
+
 @router.post("/items/{item_id}/use", response_model=UseItemResponse)
 async def use_item(
     item_id: str,
