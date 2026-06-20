@@ -1,0 +1,38 @@
+<div class="absolute top-0 right-0 w-64 h-64 bg-amber-500/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
+
+@if (cheatsheets().length === 0) {
+  <div class="flex-1 flex flex-col items-center justify-center text-center p-5 sm:p-8">
+    <div class="w-24 h-24 bg-amber-50 text-amber-400 rounded-3xl flex items-center justify-center text-5xl mb-5 shadow-inner border-[4px] border-white z-10">
+      <i class="pi pi-file"></i>
+    </div>
+    <h2 class="text-2xl font-extrabold text-slate-800 mb-2 z-10">Cheatsheets</h2>
+    <p class="text-sm text-slate-500 max-w-sm z-10">No cheatsheets generated for this document yet.</p>
+  </div>
+} @else {
+  <div class="w-full h-full overflow-y-auto text-left z-10">
+    <div class="p-5 sm:p-8 space-y-6">
+      @for (sheet of cheatsheets(); track sheet.cheatsheet_id) {
+      <div class="bg-white border border-amber-100 rounded-xl p-6 shadow-sm relative overflow-hidden">
+        <div class="absolute top-0 left-0 w-1.5 h-full bg-amber-400"></div>
+        
+        <h3 class="text-xl font-extrabold text-slate-800 mb-5 pl-4">{{ sheet.title }}</h3>
+        
+        <div class="mb-5 pl-4">
+          <h4 class="font-bold text-amber-900 mb-2.5 uppercase tracking-wider text-[10px]">Key Concepts</h4>
+          <div class="flex gap-1.5 flex-wrap">
+            @for (concept of sheet.key_concepts; track concept) {
+              <span class="px-3 py-1 bg-amber-50 border border-amber-200 text-amber-800 rounded-md text-[11px] font-medium shadow-sm">
+                {{ concept }}
+              </span>
+            }
+          </div>
+        </div>
+        
+        <div class="prose prose-amber max-w-none text-slate-700 bg-slate-50/80 p-5 rounded-lg border border-slate-100 whitespace-pre-wrap pl-4 font-mono text-[13px] leading-relaxed">
+          {{ sheet.content }}
+        </div>
+      </div>
+    }
+    </div>
+  </div>
+}

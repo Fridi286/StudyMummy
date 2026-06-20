@@ -10,6 +10,61 @@ export interface DocumentResponse {
   uploaded_at: string;
 }
 
+export interface TaskResponse {
+  task_id: string;
+  document_id: string;
+  subject_id: string;
+  topic_id: string;
+  difficulty: number;
+  task_text: string;
+  required_concepts: string[];
+  status: string;
+  created_at: string;
+}
+
+export interface QuizQuestionResponse {
+  question_id: string;
+  quiz_id: string;
+  question_text: string;
+  options: string[];
+  correct_answer: string;
+  explanation: string;
+}
+
+export interface QuizResponse {
+  quiz_id: string;
+  document_id: string;
+  title: string;
+  created_at: string;
+  questions: QuizQuestionResponse[];
+}
+
+export interface CheatsheetResponse {
+  cheatsheet_id: string;
+  document_id: string;
+  title: string;
+  content: string;
+  key_concepts: string[];
+  created_at: string;
+}
+
+export interface TaskStatusUpdate {
+  status: string;
+}
+
+export interface QuizAttemptRequest {
+  answers: Record<string, string>;
+}
+
+export interface QuizAttemptResponse {
+  attempt_id: string;
+  quiz_id: string;
+  score: number;
+  total_questions: number;
+  answers: Record<string, string>;
+  created_at: string;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -42,5 +97,29 @@ export class DocumentsService {
 
   deleteDocument(documentId: string): Observable<any> {
     return this.http.delete(`${this.apiUrl}/${documentId}`);
+  }
+
+  getDocumentTasks(documentId: string): Observable<TaskResponse[]> {
+    return this.http.get<TaskResponse[]>(`${this.apiUrl}/${documentId}/tasks`);
+  }
+
+  getDocumentQuizzes(documentId: string): Observable<QuizResponse[]> {
+    return this.http.get<QuizResponse[]>(`${this.apiUrl}/${documentId}/quizzes`);
+  }
+
+  getDocumentCheatsheets(documentId: string): Observable<CheatsheetResponse[]> {
+    return this.http.get<CheatsheetResponse[]>(`${this.apiUrl}/${documentId}/cheatsheets`);
+  }
+
+  updateTaskStatus(taskId: string, status: string): Observable<TaskResponse> {
+    return this.http.put<TaskResponse>(`${this.apiUrl}/tasks/${taskId}/status`, { status });
+  }
+
+  submitQuizAttempt(quizId: string, answers: Record<string, string>): Observable<QuizAttemptResponse> {
+    return this.http.post<QuizAttemptResponse>(`${this.apiUrl}/quizzes/${quizId}/attempts`, { answers });
+  }
+
+  getQuizAttempts(quizId: string): Observable<QuizAttemptResponse[]> {
+    return this.http.get<QuizAttemptResponse[]>(`${this.apiUrl}/quizzes/${quizId}/attempts`);
   }
 }

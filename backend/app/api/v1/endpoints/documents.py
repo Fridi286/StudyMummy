@@ -4,15 +4,20 @@ import shutil
 from datetime import datetime, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, status
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, status, BackgroundTasks
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from app.db.session import get_async_db
-from app.db.models import User, Document
+from app.db.models import User, Document, Task, Quiz, Cheatsheet
 from app.api.dependencies import get_current_user
-from app.models.document import DocumentResponse
+from app.models.document import (
+    DocumentResponse, TaskResponse, QuizResponse, CheatsheetResponse,
+    TaskStatusUpdate, QuizAttemptRequest, QuizAttemptResponse
+)
+from app.services.document_analyzer import analyze_document_background_task
 
 router = APIRouter()
 
@@ -24,6 +29,7 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 @router.post("/", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
 async def upload_document(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
@@ -65,6 +71,10 @@ async def upload_document(
     db.add(document)
     await db.commit()
     await db.refresh(document)
+
+    # Trigger AI analysis in the background
+    # The service will create its own independent DB session to avoid lifecycle issues.
+    background_tasks.add_task(analyze_document_background_task, document.document_id, file_path, current_user.user_id)
 
     return document
 
@@ -141,3 +151,112 @@ async def delete_document(
     await db.delete(document)
     await db.commit()
 
+
+@router.get("/{document_id}/tasks", response_model=list[TaskResponse])
+async def get_document_tasks(
+    document_id: str,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(get_current_user)
+):
+    stmt = select(Task).where(Task.document_id == document_id)
+    result = await db.execute(stmt)
+    return result.scalars().all()
+
+@router.get("/{document_id}/quizzes", response_model=list[QuizResponse])
+async def get_document_quizzes(
+    document_id: str,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(get_current_user)
+):
+    # Use selectinload to eagerly load the questions relationship
+    stmt = select(Quiz).options(selectinload(Quiz.questions)).where(Quiz.document_id == document_id)
+    result = await db.execute(stmt)
+    return result.scalars().all()
+
+@router.get("/{document_id}/cheatsheets", response_model=list[CheatsheetResponse])
+async def get_document_cheatsheets(
+    document_id: str,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(get_current_user)
+):
+    stmt = select(Cheatsheet).where(Cheatsheet.document_id == document_id)
+    result = await db.execute(stmt)
+    return result.scalars().all()
+
+@router.put("/tasks/{task_id}/status", response_model=TaskResponse)
+async def update_task_status(
+    task_id: str,
+    update: TaskStatusUpdate,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(get_current_user)
+):
+    stmt = select(Task).where(Task.task_id == task_id)
+    result = await db.execute(stmt)
+    task = result.scalars().first()
+    
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+        
+    # Optional: Verify task belongs to current user's document
+    # stmt = select(Document).where(Document.document_id == task.document_id)
+    # doc = (await db.execute(stmt)).scalars().first()
+    # if doc.user_id != current_user.user_id: raise HTTPException(status_code=403, detail="Forbidden")
+
+    task.status = update.status
+    await db.commit()
+    await db.refresh(task)
+    return task
+
+
+@router.post("/quizzes/{quiz_id}/attempts", response_model=QuizAttemptResponse)
+async def submit_quiz_attempt(
+    quiz_id: str,
+    attempt_request: QuizAttemptRequest,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(get_current_user)
+):
+    from app.db.models import QuizQuestion, QuizAttempt
+    
+    # 1. Fetch quiz questions to calculate score
+    stmt = select(QuizQuestion).where(QuizQuestion.quiz_id == quiz_id)
+    questions = (await db.execute(stmt)).scalars().all()
+    
+    if not questions:
+        raise HTTPException(status_code=404, detail="Quiz not found or has no questions")
+
+    # 2. Calculate score
+    score = 0
+    total_questions = len(questions)
+    correct_answers_map = {q.question_id: q.correct_answer for q in questions}
+    
+    for q_id, selected_opt in attempt_request.answers.items():
+        if q_id in correct_answers_map and correct_answers_map[q_id] == selected_opt:
+            score += 1
+            
+    # 3. Save attempt
+    attempt = QuizAttempt(
+        attempt_id=str(uuid.uuid4()),
+        quiz_id=quiz_id,
+        score=score,
+        total_questions=total_questions,
+        answers=attempt_request.answers,
+        created_at=datetime.now(timezone.utc)
+    )
+    
+    db.add(attempt)
+    await db.commit()
+    await db.refresh(attempt)
+    
+    return attempt
+
+
+@router.get("/quizzes/{quiz_id}/attempts", response_model=list[QuizAttemptResponse])
+async def get_quiz_attempts(
+    quiz_id: str,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(get_current_user)
+):
+    from app.db.models import QuizAttempt
+    stmt = select(QuizAttempt).where(QuizAttempt.quiz_id == quiz_id).order_by(QuizAttempt.created_at.desc())
+    result = await db.execute(stmt)
+    return result.scalars().all()

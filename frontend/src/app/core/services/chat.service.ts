@@ -32,6 +32,9 @@ export class ChatService {
   
   // A signal to trigger trade refreshes
   public latestTradeUpdate = signal<number>(0);
+  
+  // A signal to notify when a document finishes analyzing
+  public latestDocumentAnalyzed = signal<string | null>(null);
 
   constructor() {
     effect(() => {
@@ -73,6 +76,8 @@ export class ChatService {
           this.latestNotification.set(data);
         } else if (data.type === 'TRADE_UPDATE') {
           this.latestTradeUpdate.update(v => v + 1);
+        } else if (data.type === 'DOCUMENT_ANALYZED') {
+          this.latestDocumentAnalyzed.set(data.message);
         } else if (data.type === 'PRESENCE_STATE') {
           this.userPresence.set(data.message || {});
         } else if (data.type === 'PRESENCE_UPDATE') {

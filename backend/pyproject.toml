@@ -22,6 +22,7 @@ dependencies = [
     "email-validator>=2.3.0",
     "Pillow>=10.3.0",
     "cairosvg>=2.9.0",
+    "pymupdf>=1.27.2.3",
 ]
 
 [project.optional-dependencies]

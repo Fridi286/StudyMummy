@@ -1,0 +1,63 @@
+<div class="flex flex-col bg-white/80 backdrop-blur-md rounded-3xl border border-slate-200/60 shadow-xl overflow-hidden transition-all duration-500 shrink-0 ease-in-out origin-left h-[300px] xl:h-full"
+     [ngClass]="isLibraryExpanded() ? 'xl:w-[320px] xl:opacity-100 xl:scale-x-100' : 'xl:w-0 xl:opacity-0 xl:border-none xl:m-0 xl:scale-x-0'">
+  
+  <!-- Header & Upload -->
+  <div class="p-6 border-b border-slate-100 bg-white/50 flex justify-between items-center">
+    <h2 class="text-xl font-extrabold text-slate-800">Study Library</h2>
+    <button (click)="toggleLibrary.emit(false)" class="hidden xl:flex text-slate-400 hover:text-slate-600 bg-slate-50 hover:bg-slate-200 rounded-lg w-8 h-8 items-center justify-center transition-colors">
+      <i class="pi pi-angle-left"></i>
+    </button>
+  </div>
+  
+  <div class="p-4 border-b border-slate-100 bg-white/50">
+    <input type="file" #fileInput (change)="fileUpload.emit($event)" class="hidden" accept=".txt,.md,.csv,.json,.xml,.html,.py,.js,.ts,.css,.pdf,.epub" />
+    <button (click)="fileInput.click()" [disabled]="isAnalyzing()"
+            class="w-full px-4 py-3 bg-slate-100 hover:bg-slate-200 disabled:bg-slate-50 text-slate-700 disabled:text-slate-400 rounded-xl text-sm font-bold transition-all duration-300 flex items-center justify-center gap-2">
+      @if (isAnalyzing()) {
+        <i class="pi pi-spin pi-spinner text-indigo-500"></i> Analyzing...
+      } @else {
+        <i class="pi pi-upload"></i> Upload Material
+      }
+    </button>
+  </div>
+  
+  <!-- Document List -->
+  <div class="flex-1 overflow-y-auto p-4 space-y-2">
+    @if (documents().length === 0) {
+      <div class="text-center p-6 text-slate-500 text-sm">
+        No documents yet. Upload a file to get started!
+      </div>
+    } @else {
+      @for (doc of documents(); track doc.document_id) {
+        <div class="relative w-full flex items-center group rounded-xl transition-all duration-300"
+             [ngClass]="activeDocument()?.document_id === doc.document_id ? 'bg-indigo-50/80 shadow-sm' : 'bg-transparent hover:bg-slate-50/80'">
+          
+          <button (click)="documentSelect.emit(doc)" class="flex-1 flex items-center gap-3 px-3 py-2.5 text-left overflow-hidden">
+            <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-colors"
+                 [ngClass]="activeDocument()?.document_id === doc.document_id ? 'bg-indigo-100/50 text-indigo-600' : 'bg-slate-100 text-slate-400'">
+              <i class="pi pi-file text-sm"></i>
+            </div>
+            <div class="flex-1 min-w-0 pr-2">
+              <p class="font-semibold text-[13px] truncate transition-colors" 
+                 [ngClass]="activeDocument()?.document_id === doc.document_id ? 'text-indigo-900' : 'text-slate-700'">
+                {{ doc.file_name }}
+              </p>
+              <p class="text-[11px] text-slate-400 truncate mt-0.5">
+                {{ doc.uploaded_at | date:'shortDate' }}
+              </p>
+            </div>
+          </button>
+          
+          <!-- 3 dots menu -->
+          <div class="relative pr-2 flex items-center">
+            <button (click)="menu.toggle($event); $event.stopPropagation()" 
+                    class="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-200 hover:text-slate-700 transition-all opacity-0 group-hover:opacity-100 focus:opacity-100">
+              <i class="pi pi-ellipsis-v text-xs"></i>
+            </button>
+            <p-menu #menu [popup]="true" [model]="getMenuItems(doc)" appendTo="body" styleClass="w-36 text-sm"></p-menu>
+          </div>
+        </div>
+      }
+    }
+  </div>
+</div>

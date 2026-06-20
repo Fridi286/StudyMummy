@@ -99,6 +99,8 @@ class Document(Base):
     uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     tasks: Mapped[list["Task"]] = relationship("Task", back_populates="document", cascade="all, delete-orphan")
+    quizzes: Mapped[list["Quiz"]] = relationship("Quiz", back_populates="document", cascade="all, delete-orphan")
+    cheatsheets: Mapped[list["Cheatsheet"]] = relationship("Cheatsheet", back_populates="document", cascade="all, delete-orphan")
 
 
 class Task(Base):
@@ -114,6 +116,58 @@ class Task(Base):
     status: Mapped[str] = mapped_column(String(50), default="open", nullable=False)
 
     document: Mapped["Document"] = relationship("Document", back_populates="tasks")
+
+
+class Quiz(Base):
+    __tablename__: str = "quizzes"
+
+    quiz_id: Mapped[str] = mapped_column(String(255), primary_key=True)
+    document_id: Mapped[str] = mapped_column(String(255), ForeignKey("documents.document_id", ondelete="CASCADE"), nullable=False)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    document: Mapped["Document"] = relationship("Document", back_populates="quizzes")
+    questions: Mapped[list["QuizQuestion"]] = relationship("QuizQuestion", back_populates="quiz", cascade="all, delete-orphan")
+    attempts: Mapped[list["QuizAttempt"]] = relationship("QuizAttempt", back_populates="quiz", cascade="all, delete-orphan")
+
+
+class QuizAttempt(Base):
+    __tablename__: str = "quiz_attempts"
+
+    attempt_id: Mapped[str] = mapped_column(String(255), primary_key=True)
+    quiz_id: Mapped[str] = mapped_column(String(255), ForeignKey("quizzes.quiz_id", ondelete="CASCADE"), nullable=False)
+    score: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    total_questions: Mapped[int] = mapped_column(Integer, nullable=False)
+    answers: Mapped[dict[str, str]] = mapped_column(JSONB, server_default='{}')
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    quiz: Mapped["Quiz"] = relationship("Quiz", back_populates="attempts")
+
+
+class QuizQuestion(Base):
+    __tablename__: str = "quiz_questions"
+
+    question_id: Mapped[str] = mapped_column(String(255), primary_key=True)
+    quiz_id: Mapped[str] = mapped_column(String(255), ForeignKey("quizzes.quiz_id", ondelete="CASCADE"), nullable=False)
+    question_text: Mapped[str] = mapped_column(Text, nullable=False)
+    options: Mapped[list[str]] = mapped_column(JSONB, server_default='[]', nullable=False)
+    correct_answer: Mapped[str] = mapped_column(String(255), nullable=False)
+    explanation: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    quiz: Mapped["Quiz"] = relationship("Quiz", back_populates="questions")
+
+
+class Cheatsheet(Base):
+    __tablename__: str = "cheatsheets"
+
+    cheatsheet_id: Mapped[str] = mapped_column(String(255), primary_key=True)
+    document_id: Mapped[str] = mapped_column(String(255), ForeignKey("documents.document_id", ondelete="CASCADE"), nullable=False)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    key_concepts: Mapped[list[str]] = mapped_column(JSONB, server_default='[]', nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    document: Mapped["Document"] = relationship("Document", back_populates="cheatsheets")
 
 
 class Session(Base):

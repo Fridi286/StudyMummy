@@ -94,9 +94,8 @@ CREATE TABLE IF NOT EXISTS chat_logs (
 -- 10. Quizzes Table
 CREATE TABLE IF NOT EXISTS quizzes (
     quiz_id VARCHAR(255) PRIMARY KEY,
-    user_id VARCHAR(255) NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
-    score INT NOT NULL DEFAULT 0 CHECK (score >= 0),
-    coins_earned INT NOT NULL DEFAULT 0 CHECK (coins_earned >= 0),
+    document_id VARCHAR(255) NOT NULL REFERENCES documents(document_id) ON DELETE CASCADE,
+    title VARCHAR(255) NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -113,18 +112,17 @@ CREATE TABLE IF NOT EXISTS quiz_questions (
     quiz_id VARCHAR(255) NOT NULL REFERENCES quizzes(quiz_id) ON DELETE CASCADE,
     question_text TEXT NOT NULL,
     options JSONB NOT NULL DEFAULT '[]'::jsonb,
-    correct_option VARCHAR(255) NOT NULL,
-    user_answer VARCHAR(255),
-    is_correct BOOLEAN
+    correct_answer VARCHAR(255) NOT NULL,
+    explanation TEXT
 );
 
 -- 13. Cheatsheets Table
 CREATE TABLE IF NOT EXISTS cheatsheets (
     cheatsheet_id VARCHAR(255) PRIMARY KEY,
-    user_id VARCHAR(255) NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
-    session_id VARCHAR(255) NOT NULL REFERENCES sessions(session_id) ON DELETE CASCADE,
+    document_id VARCHAR(255) NOT NULL REFERENCES documents(document_id) ON DELETE CASCADE,
+    title VARCHAR(255) NOT NULL,
     content TEXT NOT NULL,
-    topics_covered JSONB DEFAULT '[]'::jsonb,
+    key_concepts JSONB DEFAULT '[]'::jsonb,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 

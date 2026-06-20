@@ -6,13 +6,12 @@
         <a routerLink="/" class="text-xl font-bold text-indigo-600 tracking-tight">StudyMummy</a>
 
         <!-- Clock -->
-        @if (!isCasinoPage()) {
         <div
-          class="text-slate-400 font-medium hidden sm:flex items-center gap-1.5 text-sm border-l border-slate-200 pl-4 ml-2">
+          class="text-slate-400 font-medium hidden sm:flex items-center gap-1.5 text-sm border-l border-slate-200 pl-4 ml-2 transition-all duration-1000 ease-in-out"
+          [ngClass]="isCasinoPage() ? 'opacity-0 pointer-events-none' : 'opacity-100'">
           <i class="pi pi-clock"></i>
           {{ currentTime() | date:'shortTime' }}
         </div>
-        }
       </div>
       <div class="flex items-center gap-4">
 
