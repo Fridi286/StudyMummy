@@ -111,8 +111,8 @@ async def chat(
     # Nachricht ins Gedächtnis
     await append_dialog(db, req.session_id, "user", req.message)
 
-    # RAG-Kontext holen
-    context = rag.retrieve(req.message)
+    # RAG-Kontext holen (pgvector)
+    context = await rag.retrieve(db, current_user.user_id, req.message)
 
     # Dialog-History für LLM
     messages = await get_dialog_as_messages(db, req.session_id, current_user.user_id)
@@ -158,7 +158,7 @@ async def upload_document(
         raise HTTPException(status_code=400, detail="Datei enthält keinen auswertbaren Text")
 
     doc_id = file.filename.replace(" ", "_")
-    rag.add_document(doc_id=doc_id, text=text, metadata={"filename": file.filename})
+    # Note: Vector embeddings and database storage are now handled via the main /documents/ upload background task.
 
     tasks = await _llm.extract_tasks_from_text(text)
 
@@ -169,32 +169,3 @@ async def upload_document(
     )
 
 
-@router.post("/quiz", response_model=QuizResponse, summary="Quiz generieren")
-async def generate_quiz(req: QuizRequest):
-    """Action-Schicht: Generiert ein Quiz zu einem Thema."""
-    from app.tools.study_tools import _generate_quiz_questions
-    result = await _generate_quiz_questions(
-        topic=req.topic,
-        num_questions=req.num_questions,
-    )
-    return QuizResponse(questions=result["questions"], topic=result["topic"])
-
-
-@router.post("/cheatsheet", response_model=CheatsheetResponse, summary="Cheatsheet erstellen")
-async def create_cheatsheet(
-    req: CheatsheetRequest,
-    db: Annotated[AsyncSession, Depends(get_async_db)],
-    current_user: Annotated[User, Depends(get_current_user)]
-):
-    """Action-Schicht: Erstellt ein personalisiertes Cheatsheet nach der Lerneinheit."""
-    from app.services.session_service import get_or_create_session
-    from app.tools.study_tools import _create_cheatsheet
-
-    session = await get_or_create_session(db, req.session_id, current_user.user_id)
-    topics = ["Allgemeine Konzepte"]  # TODO: aus Lernprofil laden
-    result = await _create_cheatsheet(
-        user_id=req.user_id,
-        session_id=req.session_id,
-        topics=topics,
-    )
-    return CheatsheetResponse(content=result["content"], topics_covered=topics)

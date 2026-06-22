@@ -1,7 +1,7 @@
-<div class="flex h-[calc(100vh-5rem)] w-full max-w-5xl mx-auto p-4 gap-4">
+<div class="flex h-full w-full mx-auto gap-4" [ngClass]="showSessions() ? 'p-4 max-w-5xl' : 'p-0'">
 
   <!-- Left Sidebar: Sessions -->
-  <div class="w-64 flex-shrink-0 flex flex-col gap-3">
+  <div *ngIf="showSessions()" class="w-64 flex-shrink-0 flex flex-col gap-3">
     <p-button label="New Chat" icon="pi pi-plus" styleClass="w-full" (onClick)="startNewSession()">
     </p-button>
 
@@ -36,17 +36,27 @@
   <div class="flex-1 flex flex-col gap-3 min-w-0">
 
     <!-- Header -->
-    <div class="flex items-center gap-3 px-1">
-      <div
-        class="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow">
-        <i class="pi pi-sparkles text-white text-sm"></i>
+    <div *ngIf="showHeader()" class="flex items-center justify-between px-2 pt-2">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow">
+          <i class="pi pi-sparkles text-white text-sm"></i>
+        </div>
+        <h1 class="text-lg font-bold text-gray-900">StudyMummy AI</h1>
       </div>
-      <h1 class="text-lg font-bold text-gray-900">StudyMummy AI</h1>
+      <div class="flex items-center gap-1" *ngIf="!showSessions()">
+        <button (click)="startNewSession()" pTooltip="New Chat" tooltipPosition="left" class="w-8 h-8 flex items-center justify-center rounded-lg text-indigo-500 hover:bg-indigo-50 transition-colors">
+          <i class="pi pi-plus"></i>
+        </button>
+        <button (click)="closeChat.emit()" class="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 transition-colors">
+          <i class="pi pi-times"></i>
+        </button>
+      </div>
     </div>
 
     <!-- Messages -->
     <div #scrollContainer
-      class="flex-1 overflow-y-auto flex flex-col gap-4 bg-white border border-gray-200 rounded-xl p-4">
+      class="flex-1 overflow-y-auto flex flex-col gap-4 transition-all"
+      [ngClass]="showSessions() ? 'bg-white border border-gray-200 rounded-xl p-4' : 'p-3'">
 
       <div *ngFor="let msg of messages()" class="flex w-full"
         [ngClass]="msg.role === 'user' ? 'justify-end' : 'justify-start'">
@@ -88,7 +98,8 @@
     </div>
 
     <!-- Input -->
-    <div class="bg-white border border-gray-200 rounded-2xl p-3 flex gap-3 items-end">
+    <div class="bg-white border border-gray-200 rounded-2xl flex items-end shadow-sm transition-all"
+         [ngClass]="showSessions() ? 'p-3 gap-3' : 'p-2 gap-2 mx-3 mb-3'">
       <textarea
         class="flex-1 resize-none outline-none text-sm text-gray-800 placeholder-gray-400 max-h-32 min-h-[2.5rem] overflow-y-auto bg-transparent leading-relaxed"
         [(ngModel)]="messageInput" (keydown)="onKeydown($event)" placeholder="Ask me anything about your studies..."

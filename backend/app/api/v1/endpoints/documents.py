@@ -4,7 +4,7 @@ import shutil
 from datetime import datetime, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, status, BackgroundTasks
+from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, status, BackgroundTasks
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -15,7 +15,7 @@ from app.db.models import User, Document, Task, Quiz, Cheatsheet
 from app.api.dependencies import get_current_user
 from app.models.document import (
     DocumentResponse, TaskResponse, QuizResponse, CheatsheetResponse,
-    TaskStatusUpdate, QuizAttemptRequest, QuizAttemptResponse
+    TaskStatusUpdate, QuizAttemptRequest, QuizAttemptResponse, DocumentTagsUpdate
 )
 from app.services.document_analyzer import analyze_document_background_task
 
@@ -31,6 +31,7 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 async def upload_document(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
+    tags_string: str = Form(""),
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -74,7 +75,7 @@ async def upload_document(
 
     # Trigger AI analysis in the background
     # The service will create its own independent DB session to avoid lifecycle issues.
-    background_tasks.add_task(analyze_document_background_task, document.document_id, file_path, current_user.user_id)
+    background_tasks.add_task(analyze_document_background_task, document.document_id, file_path, current_user.user_id, tags_string)
 
     return document
 
@@ -150,6 +151,32 @@ async def delete_document(
     # Delete from database
     await db.delete(document)
     await db.commit()
+
+@router.put("/{document_id}/tags", response_model=DocumentResponse)
+async def update_document_tags(
+    document_id: str,
+    update: DocumentTagsUpdate,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(get_current_user)
+):
+    stmt = select(Document).where(
+        (Document.document_id == document_id) & 
+        (Document.user_id == current_user.user_id)
+    )
+    result = await db.execute(stmt)
+    document = result.scalars().first()
+    
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found."
+        )
+        
+    document.tags = update.tags
+    await db.commit()
+    await db.refresh(document)
+    
+    return document
 
 
 @router.get("/{document_id}/tasks", response_model=list[TaskResponse])

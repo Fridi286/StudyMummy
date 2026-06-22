@@ -4,15 +4,16 @@
 html,
 body {
   font-family: 'Inter', ui-sans-serif, system-ui, sans-serif !important;
-  min-height: 100vh;
+  height: 100dvh;
   width: 100%;
   margin: 0;
   padding: 0;
+  overflow: hidden;
 }
 
 app-root {
   display: block;
-  min-height: 100vh;
+  height: 100%;
   width: 100%;
 }
 
@@ -22,6 +23,88 @@ router-outlet + * {
   flex-direction: column;
   flex: 1 1 auto;
   width: 100%;
+  min-height: 0;
 }
 
 /* You can add global styles to this file, and also import other style files */
+
+/* Global PrimeNG AutoComplete Styles */
+.p-autocomplete {
+    width: 100%;
+    display: block;
+}
+
+.p-autocomplete-multiple-container {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.75rem;
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
+    transition: all 0.2s ease;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.375rem;
+}
+
+.p-autocomplete-multiple-container:focus-within {
+    border-color: #6366f1;
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+    outline: none;
+}
+
+.p-autocomplete-token {
+    background: #eef2ff !important;
+    color: #4f46e5 !important;
+    border-radius: 9999px !important;
+    padding: 0.25rem 0.75rem !important;
+    font-size: 0.875rem !important;
+    font-weight: 600 !important;
+    margin: 0 !important;
+    border: 1px solid #c7d2fe !important;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+    display: inline-flex !important;
+    align-items: center !important;
+}
+
+.p-autocomplete-token-label {
+    margin-right: 0.375rem !important;
+}
+
+.p-autocomplete-token-icon {
+    font-size: 0.65rem !important;
+    color: #818cf8 !important;
+    transition: color 0.2s !important;
+    margin-left: 0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 1.25rem !important;
+    height: 1.25rem !important;
+    border-radius: 50% !important;
+}
+
+.p-autocomplete-token-icon:hover {
+    color: #ffffff !important;
+    background: #6366f1 !important;
+}
+
+.p-autocomplete-input-token {
+    flex: 1 1 auto !important;
+    min-width: 150px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: inline-block !important;
+}
+
+.p-autocomplete-input-token input {
+    width: 100% !important;
+    font-size: 0.875rem !important;
+    color: #334155 !important;
+    font-weight: 500 !important;
+    background: transparent !important;
+    padding: 0.25rem 0 !important;
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+}

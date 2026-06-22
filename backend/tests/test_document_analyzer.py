@@ -4,7 +4,7 @@ from app.services.document_analyzer import analyze_document_background_task
 from app.models.generation import (
     TaskGenerationSchema, GeneratedTask,
     QuizGenerationSchema, QuizQuestionSchema,
-    CheatsheetGenerationSchema
+    CheatsheetGenerationSchema, TagGenerationSchema
 )
 
 @pytest.mark.asyncio
@@ -49,20 +49,25 @@ async def test_successful_analysis_pipeline():
 
     # 3. Mock OpenAI Client
     mock_parsed_tasks = TaskGenerationSchema(
-        tasks=[GeneratedTask(difficulty=1, task_text="Task 1", required_concepts=["Bio"])]
+        tasks=[GeneratedTask(difficulty=1, task_text="Task 1", key_concepts=["Bio"])]
     )
     mock_parsed_quiz = QuizGenerationSchema(
         title="Bio Quiz",
-        questions=[QuizQuestionSchema(question_text="Q1", options=["A", "B", "C", "D"], correct_answer="A", explanation="Expl")]
+        questions=[QuizQuestionSchema(question_text="Q1", options=["A", "B", "C", "D"], correct_answer="A", explanation="Expl", key_concepts=["Bio"])]
     )
     mock_parsed_cheatsheet = CheatsheetGenerationSchema(
         title="Bio Cheat",
         content="# Cheatsheet\nBio is cool",
         key_concepts=["Biology"]
     )
+    mock_parsed_tags = TagGenerationSchema(
+        tags=["Biology", "Science"]
+    )
 
     mock_client = AsyncMock()
     # Mock the parse method to return different parsed schemas in sequence
+    mock_completion_tags = MagicMock()
+    mock_completion_tags.choices[0].message.parsed = mock_parsed_tags
     mock_completion_tasks = MagicMock()
     mock_completion_tasks.choices[0].message.parsed = mock_parsed_tasks
     
@@ -73,6 +78,7 @@ async def test_successful_analysis_pipeline():
     mock_completion_cheatsheet.choices[0].message.parsed = mock_parsed_cheatsheet
 
     mock_client.beta.chat.completions.parse = AsyncMock(side_effect=[
+        mock_completion_tags,
         mock_completion_tasks,
         mock_completion_quiz,
         mock_completion_cheatsheet
@@ -131,7 +137,7 @@ async def test_openai_failure_rollback():
         
         await analyze_document_background_task("doc_bad", "bad.pdf", "user_2")
         
-        mock_db.commit.assert_awaited_once()
+        mock_db.commit.assert_awaited()
         mock_db.rollback.assert_awaited_once()
         # Even if DB fails, currently it still sends websocket notification
         mock_send.assert_awaited_once()

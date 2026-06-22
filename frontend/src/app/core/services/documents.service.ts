@@ -7,17 +7,16 @@ export interface DocumentResponse {
   user_id: string;
   file_name: string;
   storage_path: string;
+  tags: string[];
   uploaded_at: string;
 }
 
 export interface TaskResponse {
   task_id: string;
   document_id: string;
-  subject_id: string;
-  topic_id: string;
   difficulty: number;
   task_text: string;
-  required_concepts: string[];
+  key_concepts: string[];
   status: string;
   created_at: string;
 }
@@ -29,6 +28,7 @@ export interface QuizQuestionResponse {
   options: string[];
   correct_answer: string;
   explanation: string;
+  key_concepts: string[];
 }
 
 export interface QuizResponse {
@@ -76,9 +76,12 @@ export class DocumentsService {
     return this.http.get<DocumentResponse[]>(`${this.apiUrl}/`);
   }
 
-  uploadDocument(file: File): Observable<DocumentResponse> {
+  uploadDocument(file: File, tags: string[] = []): Observable<DocumentResponse> {
     const formData = new FormData();
     formData.append('file', file);
+    if (tags.length > 0) {
+      formData.append('tags_string', tags.join(','));
+    }
     return this.http.post<DocumentResponse>(`${this.apiUrl}/`, formData);
   }
 
@@ -97,6 +100,10 @@ export class DocumentsService {
 
   deleteDocument(documentId: string): Observable<any> {
     return this.http.delete(`${this.apiUrl}/${documentId}`);
+  }
+
+  updateDocumentTags(documentId: string, tags: string[]): Observable<DocumentResponse> {
+    return this.http.put<DocumentResponse>(`${this.apiUrl}/${documentId}/tags`, { tags });
   }
 
   getDocumentTasks(documentId: string): Observable<TaskResponse[]> {

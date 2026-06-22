@@ -5,23 +5,32 @@ import { CardModule } from 'primeng/card';
 import { ButtonModule } from 'primeng/button';
 import { ToastModule } from 'primeng/toast';
 import { FileUploadModule } from 'primeng/fileupload';
-import { MessageService } from 'primeng/api';
+import { AutoCompleteModule } from 'primeng/autocomplete';
+import { FormsModule } from '@angular/forms';
+import { MessageService, ConfirmationService } from 'primeng/api';
+import { ConfirmDialogModule } from 'primeng/confirmdialog';
+import { EditTagsDialog } from '../../shared/components/edit-tags-dialog/edit-tags-dialog';
 
 @Component({
   selector: 'app-documents',
   standalone: true,
-  imports: [CommonModule, CardModule, ButtonModule, ToastModule, FileUploadModule],
-  providers: [MessageService],
+  imports: [CommonModule, CardModule, ButtonModule, ToastModule, FileUploadModule, AutoCompleteModule, FormsModule, ConfirmDialogModule, EditTagsDialog],
+  providers: [MessageService, ConfirmationService],
   templateUrl: './documents.component.html',
   styleUrls: ['./documents.component.css']
 })
 export class DocumentsComponent implements OnInit {
   documentsService = inject(DocumentsService);
   messageService = inject(MessageService);
+  confirmationService = inject(ConfirmationService);
 
   documents = signal<DocumentResponse[]>([]);
   isLoading = signal<boolean>(true);
   isUploading = signal<boolean>(false);
+  uploadTags = signal<string[]>([]);
+
+  isEditTagsDialogVisible = signal<boolean>(false);
+  selectedDocToEdit = signal<DocumentResponse | null>(null);
 
   ngOnInit() {
     this.loadDocuments();
@@ -47,11 +56,18 @@ export class DocumentsComponent implements OnInit {
     const file = event.files[0];
     this.isUploading.set(true);
     
-    this.documentsService.uploadDocument(file).subscribe({
+    this.messageService.add({
+      severity: 'info',
+      summary: 'Uploading...',
+      detail: 'Uploading and analyzing your document. This may take a minute...',
+      sticky: true
+    });
+    
+    this.documentsService.uploadDocument(file, this.uploadTags()).subscribe({
       next: (res) => {
-        this.messageService.add({ severity: 'success', summary: 'Success', detail: 'Document uploaded successfully!' });
         this.loadDocuments();
         this.isUploading.set(false);
+        this.uploadTags.set([]);
         fileUpload.clear();
       },
       error: (err) => {
@@ -71,16 +87,26 @@ export class DocumentsComponent implements OnInit {
   }
 
   deleteDocument(doc: DocumentResponse) {
-    if (!confirm('Are you sure you want to delete this document?')) return;
-    
-    this.documentsService.deleteDocument(doc.document_id).subscribe({
-      next: () => {
-        this.messageService.add({ severity: 'success', summary: 'Deleted', detail: 'Document deleted successfully.' });
-        this.loadDocuments();
-      },
-      error: (err) => {
-        this.messageService.add({ severity: 'error', summary: 'Delete Failed', detail: err.error?.detail || 'Could not delete document.' });
+    this.confirmationService.confirm({
+      message: 'Are you sure you want to delete this document?',
+      header: 'Confirm Deletion',
+      icon: 'pi pi-exclamation-triangle',
+      accept: () => {
+        this.documentsService.deleteDocument(doc.document_id).subscribe({
+          next: () => {
+            this.messageService.add({ severity: 'success', summary: 'Deleted', detail: 'Document deleted successfully.' });
+            this.loadDocuments();
+          },
+          error: (err) => {
+            this.messageService.add({ severity: 'error', summary: 'Delete Failed', detail: err.error?.detail || 'Could not delete document.' });
+          }
+        });
       }
     });
+  }
+
+  openEditTags(doc: DocumentResponse) {
+    this.selectedDocToEdit.set(doc);
+    this.isEditTagsDialogVisible.set(true);
   }
 }

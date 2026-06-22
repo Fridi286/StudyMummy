@@ -6,7 +6,7 @@ Mock-Implementierungen können durch echte Services ersetzt werden
 (Hinweis Übungsblatt 03: „Fangt mit Mock-Tools an!").
 """
 import json
-from app.tools.registry import ToolDefinition, register
+from app.tools.registry import ToolDefinition, register, ToolResult
 from app.core.logging import get_logger
 
 log = get_logger(__name__)
@@ -17,7 +17,7 @@ async def _evaluate_answer(
     task_id: str,
     user_answer: str,
     expected_concept: str,
-) -> dict:
+) -> ToolResult:
     """Mock: bewertet Nutzerantwort gegen ein erwartetes Konzept."""
     log.info("evaluate_answer called", extra={"task_id": task_id})
     # TODO: echte Bewertungslogik via LLM
@@ -48,30 +48,30 @@ register(ToolDefinition(
 # ─── update_learning_profile ──────────────────────────────────────────────────
 async def _update_learning_profile(
     user_id: str,
-    topic: str,
+    tag: str,
     score: float,
-) -> dict:
+) -> ToolResult:
     """Mock: aktualisiert Confidence-Wert eines Themas im Lernprofil."""
     log.info("update_learning_profile called", extra={"user_id": user_id})
     # TODO: echte DB-Persistenz
     return {
         "user_id": user_id,
-        "topic": topic,
+        "tag": tag,
         "new_confidence": round(min(1.0, max(0.0, score)), 2),
         "updated": True,
     }
 
 register(ToolDefinition(
     name="update_learning_profile",
-    description="Speichert den neuen Confidence-Wert für ein Thema im Nutzerprofil.",
+    description="Speichert den neuen Confidence-Wert für ein spezifisches Konzept (Tag) im Nutzerprofil. WICHTIG: Verwenden Sie immer hochgradig spezifische, granulare Konzept-Tags (z.B. 'Partielle Integration', 'Mitochondrien') anstelle von generischen Kategorien (z.B. 'Mathe', 'Biologie').",
     parameters={
         "type": "object",
         "properties": {
             "user_id": {"type": "string"},
-            "topic": {"type": "string"},
+            "tag": {"type": "string", "description": "Das granulare Konzept-Tag (z.B. 'Partielle Integration')."},
             "score": {"type": "number", "minimum": 0.0, "maximum": 1.0},
         },
-        "required": ["user_id", "topic", "score"],
+        "required": ["user_id", "tag", "score"],
     },
     fn=_update_learning_profile,
 ))
@@ -82,7 +82,7 @@ async def _generate_quiz_questions(
     topic: str,
     num_questions: int = 5,
     difficulty: int = 2,
-) -> dict:
+) -> ToolResult:
     """Mock: erzeugt Quiz-Fragen zu einem Thema."""
     log.info("generate_quiz_questions called", extra={"topic": topic})
     questions = [
@@ -117,7 +117,7 @@ async def _create_cheatsheet(
     user_id: str,
     session_id: str,
     topics: list[str],
-) -> dict:
+) -> ToolResult:
     """Mock: erstellt ein persönliches Cheatsheet nach der Lerneinheit."""
     log.info("create_cheatsheet called", extra={"user_id": user_id})
     content = "\n".join([f"## {t}\n- Konzept 1\n- Konzept 2" for t in topics])
@@ -140,7 +140,7 @@ register(ToolDefinition(
 
 
 # ─── award_coins ──────────────────────────────────────────────────────────────
-async def _award_coins(user_id: str, amount: int, reason: str) -> dict:
+async def _award_coins(user_id: str, amount: int, reason: str) -> ToolResult:
     """Mock: vergibt virtuelle Währung (Gamification)."""
     log.info("award_coins called", extra={"user_id": user_id, "amount": amount})
     return {"user_id": user_id, "coins_awarded": amount, "reason": reason}

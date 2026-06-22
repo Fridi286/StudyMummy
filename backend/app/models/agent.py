@@ -21,8 +21,7 @@ class ChatResponse(BaseModel):
 
 class ExtractedTask(BaseModel):
     task_id: str
-    subject: str
-    topic: str
+    tags: list[str]
     difficulty: int
     task_text: str
     required_concepts: list[str]

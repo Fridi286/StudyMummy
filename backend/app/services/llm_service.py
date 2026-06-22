@@ -183,8 +183,7 @@ class LLMService:
         prompt = f"""Analysiere den folgenden Text und extrahiere alle Lernaufgaben.
 Gib das Ergebnis als JSON-Array zurück. Jede Aufgabe hat:
 - task_id (string, eindeutig, z.B. "task_01")
-- subject (string, z.B. "Mathematik")
-- topic (string, z.B. "Lineare Funktionen")
+- tags (array of strings, z.B. ["Mathematik", "Lineare Funktionen"])
 - difficulty (integer, 1-5)
 - task_text (string)
 - required_concepts (array of strings)

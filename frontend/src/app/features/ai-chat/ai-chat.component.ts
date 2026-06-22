@@ -1,4 +1,4 @@
-import { Component, inject, signal, ViewChild, ElementRef, OnInit } from '@angular/core';
+import { Component, inject, signal, ViewChild, ElementRef, OnInit, input, output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AgentService, ChatMessage, SessionInfo } from '../../core/services/agent.service';
@@ -28,6 +28,9 @@ export class AiChatComponent implements OnInit {
   isLoading = signal(false);
   sessionId = '';
   activeSessionId = signal('');
+  showSessions = input<boolean>(true);
+  showHeader = input<boolean>(true);
+  closeChat = output<void>();
 
   ngOnInit() {
     this.loadSessions();

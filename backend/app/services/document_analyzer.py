@@ -6,8 +6,10 @@ from openai import AsyncOpenAI
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from app.db.models import Document, Task, Quiz, QuizQuestion, Cheatsheet, Subject, Topic
-from app.models.generation import TaskGenerationSchema, QuizGenerationSchema, CheatsheetGenerationSchema
+import textwrap
+
+from app.db.models import Document, Task, Quiz, QuizQuestion, Cheatsheet, DocumentChunk
+from app.models.generation import TaskGenerationSchema, QuizGenerationSchema, CheatsheetGenerationSchema, TagGenerationSchema
 from app.websockets.manager import manager
 from app.db.session import AsyncSessionLocal
 from app.core.logging import get_logger
@@ -46,7 +48,8 @@ def _extract_text_from_file(file_path: str) -> str:
 async def analyze_document_background_task(
     document_id: str,
     file_path: str,
-    user_id: str
+    user_id: str,
+    tags_string: str = ""
 ) -> None:
     """
     Background task to parse a document and generate AI content.
@@ -65,30 +68,75 @@ async def analyze_document_background_task(
             log.warning("Extracted text is empty.")
             return
             
-        # We will need a default Subject and Topic for the Tasks. 
-        # Let's get or create a default "General" subject and topic.
-        subject_stmt = select(Subject).where(Subject.name == "General")
-        subject_result = await db.execute(subject_stmt)
-        subject = subject_result.scalars().first()
-        
-        if not subject:
-            subject = Subject(subject_id=str(uuid.uuid4()), name="General")
-            db.add(subject)
-            await db.commit()
-            await db.refresh(subject)
-            
-        topic_stmt = select(Topic).where((Topic.name == "General") & (Topic.subject_id == subject.subject_id))
-        topic_result = await db.execute(topic_stmt)
-        topic = topic_result.scalars().first()
-        
-        if not topic:
-            topic = Topic(topic_id=str(uuid.uuid4()), name="General", subject_id=subject.subject_id)
-            db.add(topic)
-            await db.commit()
-            await db.refresh(topic)
-
         # Limit text length to prevent massive token usage for now (e.g. max 20,000 chars)
         prompt_text = full_text[:20000]
+
+        # 1.2 Generate Semantic Tags
+        log.info("Generating Semantic Tags...")
+        user_tags = [t.strip().lower() for t in tags_string.split(",")] if tags_string.strip() else []
+        final_tags = list(user_tags)
+        try:
+            tag_completion = await client.beta.chat.completions.parse(
+                model=settings.openai_model,
+                messages=[
+                    {"role": "system", "content": "You are an expert tutor. Read the text and extract 3-5 highly specific, granular semantic concepts or topics covered in the document."},
+                    {"role": "user", "content": prompt_text[:5000]} # Use first 5k chars for tagging
+                ],
+                response_format=TagGenerationSchema,
+            )
+            ai_tags_parsed = tag_completion.choices[0].message.parsed
+            if ai_tags_parsed and ai_tags_parsed.tags:
+                ai_tags = [t.lower().strip() for t in ai_tags_parsed.tags if t.strip()]
+                final_tags = list(set(user_tags + ai_tags))
+        except Exception as e:
+            log.error(f"Failed to generate tags: {e}")
+            
+        if not final_tags:
+            final_tags = ["general"]
+
+        # 1.3 Update Document with Tags
+        log.info("Updating Document tags...")
+        try:
+            from sqlalchemy import update
+            await db.execute(update(Document).where(Document.document_id == document_id).values(tags=final_tags))
+        except Exception as e:
+            log.error(f"Failed to update document tags: {e}")
+
+        # 1.5 Generate Embeddings and Chunks for RAG
+        log.info("Generating embeddings and chunks for RAG...")
+        try:
+            # Simple chunking: split to ~1000 characters
+            chunk_size = 1000
+            chunks = textwrap.wrap(full_text, chunk_size, break_long_words=False, replace_whitespace=False)
+            
+            batch_size = 100
+            chunk_index = 0
+            for i in range(0, len(chunks), batch_size):
+                batch = chunks[i:i + batch_size]
+                batch = [c.strip() for c in batch if c.strip()]
+                if not batch:
+                    continue
+                    
+                response = await client.embeddings.create(
+                    input=batch,
+                    model="text-embedding-3-small"
+                )
+                
+                for j, data in enumerate(response.data):
+                    new_chunk = DocumentChunk(
+                        chunk_id=str(uuid.uuid4()),
+                        document_id=document_id,
+                        user_id=user_id,
+                        text=batch[j],
+                        embedding=data.embedding,
+                        chunk_index=chunk_index
+                    )
+                    db.add(new_chunk)
+                    chunk_index += 1
+            await db.commit()
+            log.info(f"Saved {chunk_index} document chunks with embeddings.")
+        except Exception as e:
+            log.error(f"Failed to generate embeddings: {e}")
 
         # 2. Generate Tasks
         log.info("Generating Tasks...")
@@ -107,11 +155,9 @@ async def analyze_document_background_task(
                     new_task = Task(
                         task_id=str(uuid.uuid4()),
                         document_id=document_id,
-                        subject_id=subject.subject_id,
-                        topic_id=topic.topic_id,
                         difficulty=t.difficulty,
                         task_text=t.task_text,
-                        required_concepts=t.required_concepts,
+                        key_concepts=t.key_concepts,
                         status="open"
                     )
                     db.add(new_task)
@@ -145,7 +191,8 @@ async def analyze_document_background_task(
                         question_text=q.question_text,
                         options=q.options,
                         correct_answer=q.correct_answer,
-                        explanation=q.explanation
+                        explanation=q.explanation,
+                        key_concepts=q.key_concepts
                     )
                     db.add(new_question)
         except Exception as e:

@@ -7,7 +7,7 @@ from typing import cast
 from openai.types.chat import ChatCompletionMessageParam
 
 from app.models.memory import WorkingMemory, DialogTurn, LearningProfile
-from app.db.models import Session, ChatLog, LearningProfile as DbLearningProfile, ConfidenceScore, Topic
+from app.db.models import Session, ChatLog, LearningProfile as DbLearningProfile, ConfidenceScore
 from app.core.logging import get_logger
 
 log = get_logger(__name__)
@@ -83,17 +83,14 @@ async def get_or_create_profile(db: AsyncSession, user_id: str) -> LearningProfi
     
     # Load confidence scores
     scores_stmt = (
-        select(ConfidenceScore, Topic.name)
-        .join(Topic, ConfidenceScore.topic_id == Topic.topic_id)
+        select(ConfidenceScore)
         .where(ConfidenceScore.user_id == user_id)
     )
     scores_result = await db.execute(scores_stmt)
     
     confidence_scores: dict[str, float] = {}
-    for row in scores_result.all():
-        score_obj = cast(ConfidenceScore, row[0])
-        topic_name = cast(str, row[1])
-        confidence_scores[topic_name] = float(score_obj.confidence)
+    for score_obj in scores_result.scalars().all():
+        confidence_scores[score_obj.tag] = float(score_obj.confidence)
 
     return LearningProfile(
         user_id=db_profile.user_id,
@@ -104,7 +101,7 @@ async def get_or_create_profile(db: AsyncSession, user_id: str) -> LearningProfi
     )
 
 
-async def update_profile(db: AsyncSession, user_id: str, topic_name: str, score: float) -> LearningProfile:
+async def update_profile(db: AsyncSession, user_id: str, tag: str, score: float) -> LearningProfile:
     # First ensure profile exists and update last_seen
     _ = await get_or_create_profile(db, user_id)
     
@@ -115,33 +112,28 @@ async def update_profile(db: AsyncSession, user_id: str, topic_name: str, score:
     )
     _ = await db.execute(update_stmt)
 
-    # Find the topic_id by name (assuming topic exists for this operation, otherwise this is a no-op or would require creation)
-    topic_stmt = select(Topic).where(Topic.name == topic_name)
-    topic_result = await db.execute(topic_stmt)
-    topic = topic_result.scalars().first()
+    tag_lower = tag.strip().lower()
 
-    if topic:
-        # Check if confidence score exists
-        cs_stmt = select(ConfidenceScore).where(
-            ConfidenceScore.user_id == user_id,
-            ConfidenceScore.topic_id == topic.topic_id
+    # Check if confidence score exists
+    cs_stmt = select(ConfidenceScore).where(
+        ConfidenceScore.user_id == user_id,
+        ConfidenceScore.tag == tag_lower
+    )
+    cs_result = await db.execute(cs_stmt)
+    cs = cs_result.scalars().first()
+
+    clamped_score = round(min(1.0, max(0.0, score)), 2)
+    if cs:
+        cs.confidence = clamped_score
+        cs.updated_at = datetime.now(timezone.utc)
+    else:
+        new_cs = ConfidenceScore(
+            score_id=str(uuid.uuid4()),
+            user_id=user_id,
+            tag=tag_lower,
+            confidence=clamped_score
         )
-        cs_result = await db.execute(cs_stmt)
-        cs = cs_result.scalars().first()
-
-        clamped_score = round(min(1.0, max(0.0, score)), 2)
-        if cs:
-            cs.confidence = clamped_score
-            cs.updated_at = datetime.now(timezone.utc)
-        else:
-            new_cs = ConfidenceScore(
-                score_id=str(uuid.uuid4()),
-                user_id=user_id,
-                subject_id=topic.subject_id,
-                topic_id=topic.topic_id,
-                confidence=clamped_score
-            )
-            db.add(new_cs)
+        db.add(new_cs)
 
     await db.commit()
     return await get_or_create_profile(db, user_id)

@@ -13,6 +13,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import JSONB
+from pgvector.sqlalchemy import Vector
 
 from app.db.session import Base
 
@@ -55,34 +56,16 @@ class LearningProfile(Base):
     user: Mapped["User"] = relationship("User", back_populates="learning_profile")
 
 
-class Subject(Base):
-    __tablename__: str = "subjects"
 
-    subject_id: Mapped[str] = mapped_column(String(255), primary_key=True)
-    name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
-
-    topics: Mapped[list["Topic"]] = relationship("Topic", back_populates="subject", cascade="all, delete-orphan")
-
-
-class Topic(Base):
-    __tablename__: str = "topics"
-    __table_args__: tuple[UniqueConstraint, ...] = (UniqueConstraint("name", "subject_id"),)
-
-    topic_id: Mapped[str] = mapped_column(String(255), primary_key=True)
-    name: Mapped[str] = mapped_column(String(100), nullable=False)
-    subject_id: Mapped[str] = mapped_column(String(255), ForeignKey("subjects.subject_id", ondelete="CASCADE"), nullable=False)
-
-    subject: Mapped["Subject"] = relationship("Subject", back_populates="topics")
 
 
 class ConfidenceScore(Base):
     __tablename__: str = "confidence_scores"
-    __table_args__: tuple[UniqueConstraint, ...] = (UniqueConstraint("user_id", "subject_id", "topic_id"),)
+    __table_args__: tuple[UniqueConstraint, ...] = (UniqueConstraint("user_id", "tag"),)
 
     score_id: Mapped[str] = mapped_column(String(255), primary_key=True)
     user_id: Mapped[str] = mapped_column(String(255), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
-    subject_id: Mapped[str] = mapped_column(String(255), ForeignKey("subjects.subject_id", ondelete="CASCADE"), nullable=False)
-    topic_id: Mapped[str] = mapped_column(String(255), ForeignKey("topics.topic_id", ondelete="CASCADE"), nullable=False)
+    tag: Mapped[str] = mapped_column(String(100), nullable=False)
     confidence: Mapped[float] = mapped_column(Numeric(3, 2), default=0.0, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
@@ -96,11 +79,29 @@ class Document(Base):
     user_id: Mapped[str] = mapped_column(String(255), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
     file_name: Mapped[str] = mapped_column(String(255), nullable=False)
     storage_path: Mapped[str] = mapped_column(Text, nullable=False)
+    tags: Mapped[list[str]] = mapped_column(JSONB, server_default='[]')
     uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     tasks: Mapped[list["Task"]] = relationship("Task", back_populates="document", cascade="all, delete-orphan")
     quizzes: Mapped[list["Quiz"]] = relationship("Quiz", back_populates="document", cascade="all, delete-orphan")
     cheatsheets: Mapped[list["Cheatsheet"]] = relationship("Cheatsheet", back_populates="document", cascade="all, delete-orphan")
+    chunks: Mapped[list["DocumentChunk"]] = relationship("DocumentChunk", back_populates="document", cascade="all, delete-orphan")
+
+
+class DocumentChunk(Base):
+    __tablename__: str = "document_chunks"
+
+    chunk_id: Mapped[str] = mapped_column(String(255), primary_key=True)
+    document_id: Mapped[str] = mapped_column(String(255), ForeignKey("documents.document_id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[str] = mapped_column(String(255), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    embedding: Mapped[Any] = mapped_column(Vector(1536))
+    chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    document: Mapped["Document"] = relationship("Document", back_populates="chunks")
+    user: Mapped["User"] = relationship("User")
+
 
 
 class Task(Base):
@@ -108,11 +109,9 @@ class Task(Base):
 
     task_id: Mapped[str] = mapped_column(String(255), primary_key=True)
     document_id: Mapped[str] = mapped_column(String(255), ForeignKey("documents.document_id", ondelete="CASCADE"), nullable=False)
-    subject_id: Mapped[str] = mapped_column(String(255), ForeignKey("subjects.subject_id", ondelete="CASCADE"), nullable=False)
-    topic_id: Mapped[str] = mapped_column(String(255), ForeignKey("topics.topic_id", ondelete="CASCADE"), nullable=False)
     difficulty: Mapped[int] = mapped_column(Integer, nullable=False)
     task_text: Mapped[str] = mapped_column(Text, nullable=False)
-    required_concepts: Mapped[list[str]] = mapped_column(JSONB, server_default='[]')
+    key_concepts: Mapped[list[str]] = mapped_column(JSONB, server_default='[]')
     status: Mapped[str] = mapped_column(String(50), default="open", nullable=False)
 
     document: Mapped["Document"] = relationship("Document", back_populates="tasks")
@@ -153,6 +152,7 @@ class QuizQuestion(Base):
     options: Mapped[list[str]] = mapped_column(JSONB, server_default='[]', nullable=False)
     correct_answer: Mapped[str] = mapped_column(String(255), nullable=False)
     explanation: Mapped[str | None] = mapped_column(Text, nullable=True)
+    key_concepts: Mapped[list[str]] = mapped_column(JSONB, server_default='[]')
 
     quiz: Mapped["Quiz"] = relationship("Quiz", back_populates="questions")
 

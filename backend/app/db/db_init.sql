@@ -1,7 +1,8 @@
 -- StudyMummy Database Schema Initialization
 
--- Enable uuid-ossp extension if needed
+-- Enable extensions if needed
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS vector;
 
 -- 1. Users Table
 CREATE TABLE IF NOT EXISTS users (
@@ -25,29 +26,16 @@ CREATE TABLE IF NOT EXISTS learning_profiles (
     last_seen TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- 3. Subjects Table
-CREATE TABLE IF NOT EXISTS subjects (
-    subject_id VARCHAR(255) PRIMARY KEY,
-    name VARCHAR(100) NOT NULL UNIQUE
-);
 
--- 4. Topics Table
-CREATE TABLE IF NOT EXISTS topics (
-    topic_id VARCHAR(255) PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    subject_id VARCHAR(255) NOT NULL REFERENCES subjects(subject_id) ON DELETE CASCADE,
-    UNIQUE (name, subject_id)
-);
 
 -- 5. Confidence Scores Table
 CREATE TABLE IF NOT EXISTS confidence_scores (
     score_id VARCHAR(255) PRIMARY KEY,
     user_id VARCHAR(255) NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
-    subject_id VARCHAR(255) NOT NULL REFERENCES subjects(subject_id) ON DELETE CASCADE,
-    topic_id VARCHAR(255) NOT NULL REFERENCES topics(topic_id) ON DELETE CASCADE,
+    tag VARCHAR(100) NOT NULL,
     confidence NUMERIC(3, 2) NOT NULL DEFAULT 0.0 CHECK (confidence >= 0.0 AND confidence <= 1.0),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (user_id, subject_id, topic_id)
+    UNIQUE (user_id, tag)
 );
 
 -- 6. Documents Table
@@ -56,6 +44,7 @@ CREATE TABLE IF NOT EXISTS documents (
     user_id VARCHAR(255) NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
     file_name VARCHAR(255) NOT NULL,
     storage_path TEXT NOT NULL,
+    tags JSONB DEFAULT '[]'::jsonb,
     uploaded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -63,11 +52,9 @@ CREATE TABLE IF NOT EXISTS documents (
 CREATE TABLE IF NOT EXISTS tasks (
     task_id VARCHAR(255) PRIMARY KEY,
     document_id VARCHAR(255) NOT NULL REFERENCES documents(document_id) ON DELETE CASCADE,
-    subject_id VARCHAR(255) NOT NULL REFERENCES subjects(subject_id) ON DELETE CASCADE,
-    topic_id VARCHAR(255) NOT NULL REFERENCES topics(topic_id) ON DELETE CASCADE,
     difficulty INT NOT NULL CHECK (difficulty >= 1 AND difficulty <= 5),
     task_text TEXT NOT NULL,
-    required_concepts JSONB DEFAULT '[]'::jsonb,
+    key_concepts JSONB DEFAULT '[]'::jsonb,
     status VARCHAR(50) NOT NULL DEFAULT 'open'
 );
 
@@ -99,11 +86,15 @@ CREATE TABLE IF NOT EXISTS quizzes (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- 11. Quiz Topics (Junction Table for Quizzes <-> Topics Many-to-Many)
-CREATE TABLE IF NOT EXISTS quiz_topics (
+
+-- 11. Quiz Attempts Table
+CREATE TABLE IF NOT EXISTS quiz_attempts (
+    attempt_id VARCHAR(255) PRIMARY KEY,
     quiz_id VARCHAR(255) NOT NULL REFERENCES quizzes(quiz_id) ON DELETE CASCADE,
-    topic_id VARCHAR(255) NOT NULL REFERENCES topics(topic_id) ON DELETE CASCADE,
-    PRIMARY KEY (quiz_id, topic_id)
+    score INT NOT NULL DEFAULT 0,
+    total_questions INT NOT NULL,
+    answers JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 12. Quiz Questions Table
@@ -113,7 +104,8 @@ CREATE TABLE IF NOT EXISTS quiz_questions (
     question_text TEXT NOT NULL,
     options JSONB NOT NULL DEFAULT '[]'::jsonb,
     correct_answer VARCHAR(255) NOT NULL,
-    explanation TEXT
+    explanation TEXT,
+    key_concepts JSONB DEFAULT '[]'::jsonb
 );
 
 -- 13. Cheatsheets Table
@@ -125,6 +117,18 @@ CREATE TABLE IF NOT EXISTS cheatsheets (
     key_concepts JSONB DEFAULT '[]'::jsonb,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+-- 13.5 Document Chunks Table (for pgvector RAG)
+CREATE TABLE IF NOT EXISTS document_chunks (
+    chunk_id VARCHAR(255) PRIMARY KEY,
+    document_id VARCHAR(255) NOT NULL REFERENCES documents(document_id) ON DELETE CASCADE,
+    user_id VARCHAR(255) NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    text TEXT NOT NULL,
+    embedding vector(1536),
+    chunk_index INT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
 
 -- 14. Friendships Table
 CREATE TABLE IF NOT EXISTS friendships (

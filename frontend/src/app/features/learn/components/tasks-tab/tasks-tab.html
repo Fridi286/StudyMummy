@@ -33,7 +33,7 @@
             </span>
           </div>
           <div class="flex gap-1.5 flex-wrap">
-            @for (concept of task.required_concepts; track concept) {
+            @for (concept of task.key_concepts; track concept) {
               <span class="px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-md text-[11px] font-medium text-slate-600">
                 {{ concept }}
               </span>

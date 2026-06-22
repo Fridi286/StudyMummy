@@ -10,18 +10,20 @@ class DocumentBase(BaseModel):
 class DocumentResponse(DocumentBase):
     document_id: str
     user_id: str
+    tags: list[str] = []
     uploaded_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
 
+class DocumentTagsUpdate(BaseModel):
+    tags: list[str]
+
 class TaskResponse(BaseModel):
     task_id: str
     document_id: str
-    subject_id: str
-    topic_id: str
     difficulty: int
     task_text: str
-    required_concepts: list[str]
+    key_concepts: list[str]
     status: str
     
     model_config = ConfigDict(from_attributes=True)
@@ -32,6 +34,7 @@ class QuizQuestionResponse(BaseModel):
     options: list[str]
     correct_answer: str
     explanation: str | None = None
+    key_concepts: list[str] = []
     
     model_config = ConfigDict(from_attributes=True)
 

@@ -42,7 +42,7 @@ def test_get_learning_profile():
 
 def test_document_upload_text_file():
     """Testet den Upload-Endpunkt mit einer einfachen Textdatei (kein echter LLM-Call)."""
-    mock_tasks = [{"task_id": "t1", "subject": "Mathe", "topic": "Test", 
+    mock_tasks = [{"task_id": "t1", "tags": ["Mathe", "Test"], 
                    "difficulty": 1, "task_text": "...", "required_concepts": [], "status": "open"}]
     
     with patch(
