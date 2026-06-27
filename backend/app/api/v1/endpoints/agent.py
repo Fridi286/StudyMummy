@@ -9,7 +9,7 @@ from app.models.agent import (
     QuizRequest, QuizResponse,
     CheatsheetRequest, CheatsheetResponse,
 )
-from app.services.llm_service import LLMService
+from app.services.llm_service import LLMService, filter_user_input
 from app.services.rag_service import RAGService, get_rag_service
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_async_db
@@ -27,6 +27,7 @@ log = get_logger(__name__)
 router = APIRouter(prefix="/agent", tags=["Agent"])
 
 _llm = LLMService()
+CHAT_ALLOWED_TOOL_NAMES = ("evaluate_answer",)
 
 
 @router.get("/sessions", summary="List user's chat sessions")
@@ -101,18 +102,23 @@ async def chat(
 ):
     """
     Hauptendpunkt: Nutzer schreibt eine Nachricht, der Agent antwortet sokratisch
-    und nutzt bei Bedarf Tools (evaluate_answer, update_learning_profile, award_coins).
+    und nutzt bei Bedarf nur das eng erlaubte Tool-Subset für diesen Chat.
     """
+    try:
+        message = filter_user_input(req.message)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     # Working Memory auffrischen
     session = await get_or_create_session(db, req.session_id, current_user.user_id)
     if req.task_id:
         session.current_task_id = req.task_id
 
     # Nachricht ins Gedächtnis
-    await append_dialog(db, req.session_id, "user", req.message)
+    await append_dialog(db, req.session_id, "user", message)
 
     # RAG-Kontext holen (pgvector)
-    context = await rag.retrieve(db, current_user.user_id, req.message)
+    context = await rag.retrieve(db, current_user.user_id, message)
 
     # Dialog-History für LLM
     messages = await get_dialog_as_messages(db, req.session_id, current_user.user_id)
@@ -121,6 +127,7 @@ async def chat(
     reply, tools_called = await _llm.chat_with_tools(
         messages=messages,
         extra_context=context or None,
+        allowed_tool_names=CHAT_ALLOWED_TOOL_NAMES,
     )
 
     await append_dialog(db, req.session_id, "assistant", reply)

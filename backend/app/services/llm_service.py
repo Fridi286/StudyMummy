@@ -3,6 +3,7 @@ LLM-Service: kapselt alle OpenAI-Calls mit Tool Use (Function Calling).
 Zentrale Stelle für alle LLM-Interaktionen – leicht gegen ein anderes LLM austauschbar.
 """
 import json
+import re
 import time
 from typing import Iterable, cast, Any
 from openai import AsyncOpenAI
@@ -24,6 +25,24 @@ Prinzipien:
 3. Anerkenne Fortschritte und vergibt Münzen bei korrekten Antworten.
 4. Wenn eine Aufgabe gelöst ist, aktualisiere das Lernprofil.
 5. Antworte immer auf Deutsch, klar und motivierend."""
+
+MAX_USER_INPUT_CHARS = 4000
+BLOCKED_INPUT_PATTERNS = (
+    re.compile(r"(?i)\bignore\b.*\b(previous|all)\b.*\binstructions\b"),
+    re.compile(r"(?i)\b(reveal|show|print)\b.*\b(system prompt|developer message|hidden prompt)\b"),
+    re.compile(r"(?i)\bdeveloper message\b"),
+)
+
+
+def filter_user_input(text: str) -> str:
+    cleaned = text.replace("\x00", "").strip()
+    cleaned = re.sub(r"\s+", " ", cleaned)
+    if len(cleaned) > MAX_USER_INPUT_CHARS:
+        raise ValueError("Eingabe ist zu lang.")
+    for pattern in BLOCKED_INPUT_PATTERNS:
+        if pattern.search(cleaned):
+            raise ValueError("Eingabe enthält unzulässige Anweisungen.")
+    return cleaned
 
 
 def _preview(value: str | Iterable[ChatCompletionContentPartParam], max_chars: int = 180) -> str:
@@ -60,16 +79,30 @@ class LLMService:
         messages: list[ChatCompletionMessageParam],
         system_prompt: str = SOCRATIC_SYSTEM_PROMPT,
         extra_context: str | None = None,
+        allowed_tool_names: Iterable[str] | None = None,
     ) -> tuple[str, list[str]]:
         """
         Führt einen LLM-Call mit Tool Use durch (ReAct-Loop).
         Gibt (final_message, tool_calls_made) zurück.
         """
+        filtered_messages: list[ChatCompletionMessageParam] = []
+        for message in messages:
+            if message.get("role") == "user":
+                content = message.get("content", "")
+                if not isinstance(content, str):
+                    content = str(content)
+                filtered_content = filter_user_input(content)
+                filtered_messages.append(cast(ChatCompletionMessageParam, {**message, "content": filtered_content}))
+            else:
+                filtered_messages.append(message)
+
+        allowed_tool_set = set(allowed_tool_names) if allowed_tool_names is not None else None
+
         trace = get_trace_id()
         started_at = time.perf_counter()
         log.info(
             f"[{trace}] LLM call started, messages={len(messages)}, "
-            f"extra_context={bool(extra_context)}, input_preview={_last_user_message(messages)!r}"
+            f"extra_context={bool(extra_context)}, input_preview={_last_user_message(filtered_messages)!r}"
         )
 
         full_messages: list[ChatCompletionMessageParam] = [{"role": "system", "content": system_prompt}]
@@ -78,9 +111,14 @@ class LLMService:
                 "role": "system",
                 "content": f"[RAG-Kontext]\n{extra_context}"
             })
-        full_messages.extend(messages)
+        if allowed_tool_names is not None:
+            full_messages.append({
+                "role": "system",
+                "content": f"[Tool-Scope] Erlaubte Tools in diesem Kontext: {', '.join(allowed_tool_names)}. Nutze keine anderen Tools."
+            })
+        full_messages.extend(filtered_messages)
 
-        tools = as_openai_tools()
+        tools = as_openai_tools(allowed_tool_names)
         supports_tools = "qwen" not in self.model.lower()
         tool_calls_made: list[str] = []
 
@@ -138,6 +176,15 @@ class LLMService:
                 if tc.type != "function":
                     continue
                 fn_name = tc.function.name
+                if allowed_tool_set is not None and fn_name not in allowed_tool_set:
+                    log.warning(f"[{trace}] Blocked disallowed tool call: {fn_name}")
+                    full_messages.append({
+                        "role": "tool",
+                        "tool_call_id": tc.id,
+                        "content": json.dumps({"error": "Tool not allowed in this context."}, ensure_ascii=False),
+                    })
+                    continue
+
                 tool_calls_made.append(fn_name)
                 try:
                     fn_args = json.loads(tc.function.arguments or "{}")
