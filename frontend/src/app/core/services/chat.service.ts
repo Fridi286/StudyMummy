@@ -36,6 +36,9 @@ export class ChatService {
   // A signal to notify when a document finishes analyzing
   public latestDocumentAnalyzed = signal<string | null>(null);
 
+  // A signal to notify when background document analysis fails
+  public latestDocumentAnalysisFailed = signal<{ documentId: string | null; message: string } | null>(null);
+
   constructor() {
     effect(() => {
       const user = this.authService.currentUser();
@@ -78,6 +81,11 @@ export class ChatService {
           this.latestTradeUpdate.update(v => v + 1);
         } else if (data.type === 'DOCUMENT_ANALYZED') {
           this.latestDocumentAnalyzed.set(data.message);
+        } else if (data.type === 'DOCUMENT_ANALYSIS_FAILED') {
+          this.latestDocumentAnalysisFailed.set({
+            documentId: data.document_id ?? null,
+            message: data.message || 'Document analysis failed.'
+          });
         } else if (data.type === 'PRESENCE_STATE') {
           this.userPresence.set(data.message || {});
         } else if (data.type === 'PRESENCE_UPDATE') {

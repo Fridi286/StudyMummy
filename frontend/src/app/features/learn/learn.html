@@ -93,7 +93,9 @@
           }
 
           @if (activeTab() === 'tasks') {
-          <app-tasks-tab class="block w-full h-full min-h-0" [tasks]="generatedTasks()" (taskToggle)="toggleTaskCompletion($event)">
+          <app-tasks-tab class="block w-full h-full min-h-0" [tasks]="generatedTasks()"
+            (taskToggle)="toggleTaskCompletion($event)"
+            (taskStatusChange)="updateTaskStatus($event.task, $event.status)">
           </app-tasks-tab>
           }
 

@@ -6,7 +6,7 @@ import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { MenuModule } from 'primeng/menu';
 import { MenuItem } from 'primeng/api';
 import { ChatService } from '../../core/services/chat.service';
-import { DocumentsService, TaskResponse, QuizResponse, CheatsheetResponse, DocumentResponse, QuizAttemptResponse } from '../../core/services/documents.service';
+import { DocumentsService, TaskResponse, TaskStatus, QuizResponse, CheatsheetResponse, DocumentResponse, QuizAttemptResponse } from '../../core/services/documents.service';
 import { finalize } from 'rxjs/operators';
 
 import { EditTagsDialog } from '../../shared/components/edit-tags-dialog/edit-tags-dialog';
@@ -77,6 +77,24 @@ export class Learn implements OnInit {
 
         // Refresh documents to show the new one, and select it
         this.fetchDocuments(docId);
+        this.messageService.add({
+          severity: 'success',
+          summary: 'Analysis Complete',
+          detail: 'Tasks, quizzes, and cheatsheet are ready.'
+        });
+      }
+    }, { allowSignalWrites: true });
+
+    effect(() => {
+      const failure = this.chatService.latestDocumentAnalysisFailed();
+      if (failure) {
+        this.isAnalyzing.set(false);
+        this.fetchDocuments();
+        this.messageService.add({
+          severity: 'error',
+          summary: 'Analysis Failed',
+          detail: failure.message
+        });
       }
     }, { allowSignalWrites: true });
 
@@ -225,11 +243,14 @@ export class Learn implements OnInit {
 
   private fetchGeneratedArtifacts(documentId: string) {
     this.documentsService.getDocumentTasks(documentId).subscribe(tasks => {
-      // Sort tasks: open first, completed last
+      const statusOrder: Record<TaskStatus, number> = {
+        open: 0,
+        in_progress: 1,
+        repeat: 2,
+        solved: 3
+      };
       const sorted = [...tasks].sort((a, b) => {
-        if (a.status === 'completed' && b.status !== 'completed') return 1;
-        if (a.status !== 'completed' && b.status === 'completed') return -1;
-        return 0;
+        return statusOrder[a.status] - statusOrder[b.status];
       });
       this.generatedTasks.set(sorted);
     });
@@ -262,7 +283,13 @@ export class Learn implements OnInit {
 
   // --- Task Logic ---
   toggleTaskCompletion(task: TaskResponse) {
-    const newStatus = task.status === 'completed' ? 'open' : 'completed';
+    const newStatus = task.status === 'solved' ? 'open' : 'solved';
+    this.updateTaskStatus(task, newStatus);
+  }
+
+  updateTaskStatus(task: TaskResponse, newStatus: TaskStatus) {
+    if (task.status === newStatus) return;
+
     // Optimistically update
     this.generatedTasks.update(tasks => tasks.map(t => t.task_id === task.task_id ? { ...t, status: newStatus } : t));
 

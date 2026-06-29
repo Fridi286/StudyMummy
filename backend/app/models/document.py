@@ -1,5 +1,13 @@
 from datetime import datetime
+from enum import Enum
 from pydantic import BaseModel, ConfigDict
+
+
+class TaskStatus(str, Enum):
+    open = "open"
+    in_progress = "in_progress"
+    solved = "solved"
+    repeat = "repeat"
 
 
 class DocumentBase(BaseModel):
@@ -24,7 +32,7 @@ class TaskResponse(BaseModel):
     difficulty: int
     task_text: str
     key_concepts: list[str]
-    status: str
+    status: TaskStatus
     
     model_config = ConfigDict(from_attributes=True)
 
@@ -58,7 +66,7 @@ class CheatsheetResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 class TaskStatusUpdate(BaseModel):
-    status: str
+    status: TaskStatus
 
 class QuizAttemptRequest(BaseModel):
     answers: dict[str, str]

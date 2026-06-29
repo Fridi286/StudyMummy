@@ -27,6 +27,25 @@ MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB
 # Ensure upload directory exists
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+
+async def _get_user_document_or_404(
+    document_id: str,
+    db: AsyncSession,
+    current_user: User,
+) -> Document:
+    stmt = select(Document).where(
+        (Document.document_id == document_id) &
+        (Document.user_id == current_user.user_id)
+    )
+    result = await db.execute(stmt)
+    document = result.scalars().first()
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found."
+        )
+    return document
+
 @router.post("/", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
 async def upload_document(
     background_tasks: BackgroundTasks,
@@ -96,18 +115,7 @@ async def download_document(
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):
-    stmt = select(Document).where(
-        (Document.document_id == document_id) & 
-        (Document.user_id == current_user.user_id)
-    )
-    result = await db.execute(stmt)
-    document = result.scalars().first()
-    
-    if not document:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Document not found."
-        )
+    document = await _get_user_document_or_404(document_id, db, current_user)
         
     if not os.path.exists(document.storage_path):
         raise HTTPException(
@@ -127,18 +135,7 @@ async def delete_document(
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):
-    stmt = select(Document).where(
-        (Document.document_id == document_id) & 
-        (Document.user_id == current_user.user_id)
-    )
-    result = await db.execute(stmt)
-    document = result.scalars().first()
-    
-    if not document:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Document not found."
-        )
+    document = await _get_user_document_or_404(document_id, db, current_user)
         
     # Remove from filesystem
     if os.path.exists(document.storage_path):
@@ -159,18 +156,7 @@ async def update_document_tags(
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):
-    stmt = select(Document).where(
-        (Document.document_id == document_id) & 
-        (Document.user_id == current_user.user_id)
-    )
-    result = await db.execute(stmt)
-    document = result.scalars().first()
-    
-    if not document:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Document not found."
-        )
+    document = await _get_user_document_or_404(document_id, db, current_user)
         
     document.tags = update.tags
     await db.commit()
@@ -185,6 +171,7 @@ async def get_document_tasks(
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):
+    await _get_user_document_or_404(document_id, db, current_user)
     stmt = select(Task).where(Task.document_id == document_id)
     result = await db.execute(stmt)
     return result.scalars().all()
@@ -195,6 +182,7 @@ async def get_document_quizzes(
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):
+    await _get_user_document_or_404(document_id, db, current_user)
     # Use selectinload to eagerly load the questions relationship
     stmt = select(Quiz).options(selectinload(Quiz.questions)).where(Quiz.document_id == document_id)
     result = await db.execute(stmt)
@@ -206,6 +194,7 @@ async def get_document_cheatsheets(
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):
+    await _get_user_document_or_404(document_id, db, current_user)
     stmt = select(Cheatsheet).where(Cheatsheet.document_id == document_id)
     result = await db.execute(stmt)
     return result.scalars().all()
@@ -217,19 +206,21 @@ async def update_task_status(
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):
-    stmt = select(Task).where(Task.task_id == task_id)
+    stmt = (
+        select(Task)
+        .join(Document)
+        .where(
+            Task.task_id == task_id,
+            Document.user_id == current_user.user_id,
+        )
+    )
     result = await db.execute(stmt)
     task = result.scalars().first()
     
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
         
-    # Optional: Verify task belongs to current user's document
-    # stmt = select(Document).where(Document.document_id == task.document_id)
-    # doc = (await db.execute(stmt)).scalars().first()
-    # if doc.user_id != current_user.user_id: raise HTTPException(status_code=403, detail="Forbidden")
-
-    task.status = update.status
+    task.status = update.status.value
     await db.commit()
     await db.refresh(task)
     return task
@@ -243,6 +234,18 @@ async def submit_quiz_attempt(
     current_user: User = Depends(get_current_user)
 ):
     from app.db.models import QuizQuestion, QuizAttempt
+
+    quiz_stmt = (
+        select(Quiz)
+        .join(Document)
+        .where(
+            Quiz.quiz_id == quiz_id,
+            Document.user_id == current_user.user_id,
+        )
+    )
+    quiz = (await db.execute(quiz_stmt)).scalars().first()
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz not found")
     
     # 1. Fetch quiz questions to calculate score
     stmt = select(QuizQuestion).where(QuizQuestion.quiz_id == quiz_id)
@@ -284,6 +287,18 @@ async def get_quiz_attempts(
     current_user: User = Depends(get_current_user)
 ):
     from app.db.models import QuizAttempt
+    quiz_stmt = (
+        select(Quiz)
+        .join(Document)
+        .where(
+            Quiz.quiz_id == quiz_id,
+            Document.user_id == current_user.user_id,
+        )
+    )
+    quiz = (await db.execute(quiz_stmt)).scalars().first()
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz not found")
+
     stmt = select(QuizAttempt).where(QuizAttempt.quiz_id == quiz_id).order_by(QuizAttempt.created_at.desc())
     result = await db.execute(stmt)
     return result.scalars().all()
