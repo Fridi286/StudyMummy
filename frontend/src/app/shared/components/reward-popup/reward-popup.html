@@ -1,0 +1,41 @@
+@if (visible()) {
+<div class="fixed top-20 right-10 z-[9999] w-80 max-w-[90vw] animate-[slideInRight_0.4s_ease-out_forwards]">
+  <div class="bg-white border border-slate-200/70 shadow-[0_10px_40px_-10px_rgba(0,0,0,0.1)] rounded-2xl p-5 overflow-hidden relative transition-transform duration-300 hover:-translate-y-1">
+    
+    <!-- Subtle top shimmer effect -->
+    <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/50 to-transparent -translate-x-full animate-[shimmer_2s_infinite]"></div>
+
+    <div class="flex items-center justify-between mb-4 relative z-10">
+      <div>
+        @if (isLevelUp()) {
+          <h3 class="font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-500 to-orange-500 text-lg tracking-tight flex items-center gap-1.5 drop-shadow-sm">LEVEL UP! 🚀</h3>
+          <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">You are now <span class="text-amber-600 font-extrabold">{{ newRole() }}</span> (Lvl {{ newLevelNum() }})</p>
+        } @else {
+          <h3 class="font-bold text-slate-700 text-base tracking-tight flex items-center gap-1.5">Rewards Unlocked! 🎉</h3>
+          <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mt-0.5">{{ rewardData()?.reason || 'Great Job!' }}</p>
+        }
+      </div>
+      <div class="bg-amber-50 text-amber-600 font-black px-3 py-1.5 rounded-xl flex items-center gap-1.5 border border-amber-100">
+        <i class="pi pi-star-fill text-amber-500 animate-bounce" style="animation-duration: 2s;"></i>
+        +{{ rewardData()?.coins }}
+      </div>
+    </div>
+    
+    <div class="relative z-10 mt-2">
+      <div class="flex justify-between items-end mb-1.5">
+        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Experience Gained</span>
+        <span class="text-sm font-black text-indigo-600">+{{ rewardData()?.experience }} XP</span>
+      </div>
+      <div class="w-full h-3 bg-slate-100 rounded-full overflow-hidden border border-slate-200/50">
+        <!-- Progress Fill -->
+        <div class="h-full bg-indigo-500 rounded-full transition-all duration-[1200ms] ease-out relative"
+             [style.width.%]="progressValue()">
+             <!-- Inner subtle shine on the bar -->
+             <div class="absolute top-0 right-0 bottom-0 w-8 bg-gradient-to-r from-transparent to-white/30"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+}

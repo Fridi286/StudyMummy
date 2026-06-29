@@ -11,6 +11,7 @@ from app.models.agent import (
 )
 from app.services.llm_service import LLMService
 from app.services.rag_service import RAGService, get_rag_service
+from app.core.context import current_user_id
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_async_db
 from app.api.dependencies import get_current_user
@@ -103,6 +104,9 @@ async def chat(
     Hauptendpunkt: Nutzer schreibt eine Nachricht, der Agent antwortet sokratisch
     und nutzt bei Bedarf Tools (evaluate_answer, update_learning_profile, award_coins).
     """
+    # Set context variable for tools
+    current_user_id.set(current_user.user_id)
+
     # Working Memory auffrischen
     session = await get_or_create_session(db, req.session_id, current_user.user_id)
     if req.task_id:
@@ -112,7 +116,13 @@ async def chat(
     await append_dialog(db, req.session_id, "user", req.message)
 
     # RAG-Kontext holen (pgvector)
-    context = await rag.retrieve(db, current_user.user_id, req.message)
+    rag_context = await rag.retrieve(db, current_user.user_id, req.message)
+
+    from datetime import datetime
+    current_time_str = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+    context = f"HEUTIGES DATUM UND UHRZEIT: {current_time_str}\n\n"
+    if rag_context:
+        context += rag_context
 
     # Dialog-History für LLM
     messages = await get_dialog_as_messages(db, req.session_id, current_user.user_id)

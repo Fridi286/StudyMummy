@@ -6,8 +6,15 @@ Mock-Implementierungen können durch echte Services ersetzt werden
 (Hinweis Übungsblatt 03: „Fangt mit Mock-Tools an!").
 """
 import json
+import uuid
+from datetime import datetime, timezone
+from sqlalchemy import select
 from app.tools.registry import ToolDefinition, register, ToolResult
 from app.core.logging import get_logger
+from app.db.session import AsyncSessionLocal
+from app.db.models import User, ActiveItem, CalendarNote
+from app.core.context import current_user_id
+from app.websockets.manager import manager
 
 log = get_logger(__name__)
 
@@ -139,23 +146,109 @@ register(ToolDefinition(
 ))
 
 
-# ─── award_coins ──────────────────────────────────────────────────────────────
-async def _award_coins(user_id: str, amount: int, reason: str) -> ToolResult:
-    """Mock: vergibt virtuelle Währung (Gamification)."""
-    log.info("award_coins called", extra={"user_id": user_id, "amount": amount})
-    return {"user_id": user_id, "coins_awarded": amount, "reason": reason}
+# ─── award_coins_and_exp ──────────────────────────────────────────────────────
+async def _award_coins_and_exp(amount: int, reason: str) -> ToolResult:
+    """Real: vergibt Münzen und Erfahrungspunkte (mit aktiven Multiplikatoren)."""
+    user_id = current_user_id.get()
+    if not user_id:
+        return {"error": "Kein user_id im Kontext"}
+
+    log.info("award_coins_and_exp called", extra={"user_id": user_id, "amount": amount})
+    
+    async with AsyncSessionLocal() as db:
+        stmt = select(User).where(User.user_id == user_id)
+        current_user = (await db.execute(stmt)).scalars().first()
+        if not current_user:
+            return {"error": "Nutzer nicht gefunden"}
+            
+        now_utc = datetime.now(timezone.utc)
+        stmt_boosts = select(ActiveItem).where(
+            ActiveItem.user_id == user_id,
+            (ActiveItem.expires_at == None) | (ActiveItem.expires_at > now_utc)
+        )
+        active_boosts = (await db.execute(stmt_boosts)).scalars().all()
+        
+        xp_multiplier = 1.0
+        for boost in active_boosts:
+            if "xp_multiplier" in boost.effects:
+                xp_multiplier *= float(boost.effects["xp_multiplier"])
+                
+        final_exp = int(amount * xp_multiplier)
+        current_user.coins += amount
+        current_user.experience += final_exp
+        
+        await db.commit()
+        
+    await manager.send_personal_message(user_id, {
+        "type": "REWARD_GAINED",
+        "coins": amount,
+        "experience": final_exp,
+        "total_experience": current_user.experience,
+        "reason": reason
+    })
+        
+    return {
+        "coins_awarded": amount, 
+        "exp_awarded": final_exp, 
+        "reason": reason
+    }
 
 register(ToolDefinition(
-    name="award_coins",
-    description="Vergibt virtuelle Währung an den Nutzer als Belohnung.",
+    name="award_coins_and_exp",
+    description="Vergibt virtuelle Münzen und Erfahrungspunkte an den Nutzer als Belohnung für eine gute Antwort.",
     parameters={
         "type": "object",
         "properties": {
-            "user_id": {"type": "string"},
-            "amount": {"type": "integer", "minimum": 1},
-            "reason": {"type": "string"},
+            "amount": {"type": "integer", "minimum": 1, "description": "Basis-Menge an Münzen/Exp"},
+            "reason": {"type": "string", "description": "Grund für die Belohnung"}
         },
-        "required": ["user_id", "amount", "reason"],
+        "required": ["amount", "reason"],
     },
-    fn=_award_coins,
+    fn=_award_coins_and_exp,
+))
+
+# ─── add_calendar_note ────────────────────────────────────────────────────────
+async def _add_calendar_note(title: str, content: str, start_time: str, end_time: str) -> ToolResult:
+    """Real: Trägt eine Notiz/Lerneinheit in den Kalender ein."""
+    user_id = current_user_id.get()
+    if not user_id:
+        return {"error": "Kein user_id im Kontext"}
+        
+    log.info("add_calendar_note called", extra={"user_id": user_id, "title": title})
+    
+    try:
+        start_dt = datetime.fromisoformat(start_time.replace('Z', '+00:00'))
+        end_dt = datetime.fromisoformat(end_time.replace('Z', '+00:00'))
+    except ValueError as e:
+        return {"error": f"Ungültiges Datumsformat: {e}"}
+
+    async with AsyncSessionLocal() as db:
+        note = CalendarNote(
+            note_id=str(uuid.uuid4()),
+            user_id=user_id,
+            title=title,
+            content=content,
+            start_time=start_dt,
+            end_time=end_dt,
+            created_at=datetime.now(timezone.utc)
+        )
+        db.add(note)
+        await db.commit()
+        
+    return {"status": "success", "title": title, "start_time": start_time}
+
+register(ToolDefinition(
+    name="add_calendar_note",
+    description="Erstellt einen Kalendereintrag (Lernsession/Erinnerung) für den Nutzer.",
+    parameters={
+        "type": "object",
+        "properties": {
+            "title": {"type": "string", "description": "Kurzer Titel des Termins"},
+            "content": {"type": "string", "description": "Details oder Ziele der Lernsession"},
+            "start_time": {"type": "string", "description": "Startzeitpunkt als ISO-8601 String (z.B. 2026-06-30T15:00:00Z)"},
+            "end_time": {"type": "string", "description": "Endzeitpunkt als ISO-8601 String"}
+        },
+        "required": ["title", "content", "start_time", "end_time"],
+    },
+    fn=_add_calendar_note,
 ))

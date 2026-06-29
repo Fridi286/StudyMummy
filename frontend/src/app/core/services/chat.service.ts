@@ -35,6 +35,9 @@ export class ChatService {
   
   // A signal to notify when a document finishes analyzing
   public latestDocumentAnalyzed = signal<string | null>(null);
+  
+  // A signal to hold the latest reward gained event
+  public latestReward = signal<any | null>(null);
 
   constructor() {
     effect(() => {
@@ -78,6 +81,8 @@ export class ChatService {
           this.latestTradeUpdate.update(v => v + 1);
         } else if (data.type === 'DOCUMENT_ANALYZED') {
           this.latestDocumentAnalyzed.set(data.message);
+        } else if (data.type === 'REWARD_GAINED') {
+          this.latestReward.set(data);
         } else if (data.type === 'PRESENCE_STATE') {
           this.userPresence.set(data.message || {});
         } else if (data.type === 'PRESENCE_UPDATE') {
