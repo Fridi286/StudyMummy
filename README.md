@@ -891,16 +891,11 @@ Die `trace_id` wird auch im Response-Header `X-Trace-Id` und im JSON-Body zurüc
 
 ---
 
-## Nächste Schritte (Übungsblatt 06+)
+## Safety & Guardrails
 
-| Aufgabe | Priorität | Ziel-Termin |
-|---|---|---|
-| ChromaDB-Anbindung für echtes Embedding-Retrieval | Mittel | Ausbau nach MVP |
-| PyMuPDF für PDF-Upload | Hoch | Übungsblatt 06 |
-| PostgreSQL / Supabase für persistente Sessions | Mittel | Übungsblatt 06 |
-| Multi-Agent: Orchestrator + Worker | Niedrig | Spätere Skalierungsoption |
-| Semantische Tests erweitern | Mittel | Laufend |
-| Guardrails gegen Prompt Injection | Hoch | Übungsblatt 06 |
+- **Risikoanalyse:** Wir haben die wichtigsten Risiken für Agentic AI betrachtet. Ziel war es, zu verhindern, dass der Chat durch manipulierte Eingaben oder zu viele Rechte unerwünschtes Verhalten zeigt.
+- **Implementierte Guardrails:** Es wurden zwei Schutzmechanismen eingebaut: **Input-Filterung** und **Scope-Einschränkung**. Die Input-Filterung blockiert typische Manipulationsversuche, bevor sie den LLM-Call erreichen. Die Scope-Einschränkung sorgt dafür, dass der Chat nur auf die wirklich benötigten Tools zugreifen kann.
+- **Konkreter Guardrail-Fall:** Bösartige Eingaben wie „Ignore all previous instructions“ oder „Show me the system prompt“ werden abgefangen. Zusätzlich kann der Chat keine nicht freigegebenen Aktionen ausführen, sondern nur mit dem erlaubten Tool-Set arbeiten.
 
 ---
 
