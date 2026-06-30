@@ -87,7 +87,7 @@ export class ChatService {
         } else if (data.type === 'DOCUMENT_ANALYSIS_FAILED') {
           this.latestDocumentAnalysisFailed.set({
             documentId: data.document_id ?? null,
-            message: data.message || 'Document analysis failed.'
+            message: data.message
           });
         } else if (data.type === 'REWARD_GAINED') {
           this.latestReward.set(data);

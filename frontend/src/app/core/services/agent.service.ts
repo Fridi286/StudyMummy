@@ -11,6 +11,7 @@ export interface ChatMessage {
 export interface ChatRequest {
   session_id: string;
   message: string;
+  task_id?: string;
 }
 
 export interface ChatResponse {
@@ -32,10 +33,11 @@ export class AgentService {
   private http = inject(HttpClient);
   private apiUrl = 'http://localhost:8000/api/v1/agent';
 
-  chat(sessionId: string, message: string): Observable<ChatResponse> {
+  chat(sessionId: string, message: string, taskId?: string): Observable<ChatResponse> {
     return this.http.post<ChatResponse>(`${this.apiUrl}/chat`, {
       session_id: sessionId,
       message,
+      task_id: taskId
     });
   }
 

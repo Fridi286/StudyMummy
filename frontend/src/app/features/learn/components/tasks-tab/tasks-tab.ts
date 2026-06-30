@@ -34,4 +34,5 @@ export class TasksTab {
     const status = (event.target as HTMLSelectElement).value as TaskStatus;
     this.taskStatusChange.emit({ task, status });
   }
+  taskChat = output<TaskResponse>();
 }

@@ -48,6 +48,7 @@ export class Learn implements OnInit {
   isResizing = signal<boolean>(false);
   chatMenuItems = signal<MenuItem[]>([]);
   aiChat = viewChild<AiChatComponent>('aiChat');
+  activeChatTaskId = signal<string | undefined>(undefined);
   private dragStartX = 0;
   private dragStartWidth = 0;
 
@@ -311,6 +312,11 @@ export class Learn implements OnInit {
         this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to update task status' });
       }
     });
+  }
+
+  openChatForTask(task: TaskResponse) {
+    this.activeChatTaskId.set(task.task_id);
+    this.isChatExpanded.set(true);
   }
 
   // --- Quiz Logic ---

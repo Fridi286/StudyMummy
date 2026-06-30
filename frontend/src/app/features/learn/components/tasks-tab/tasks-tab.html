@@ -28,14 +28,18 @@
                 [ngClass]="task.status === 'solved' ? 'text-slate-400 line-through' : 'text-slate-800'">
               {{ task.task_text }}
             </h3>
-            <div class="flex items-center gap-2 flex-wrap justify-start sm:justify-end shrink-0">
-              <span class="px-2.5 py-1 border rounded-full text-[10px] uppercase font-bold whitespace-nowrap mt-1 sm:mt-0"
+            <div class="flex items-center gap-2 flex-wrap justify-start sm:justify-end shrink-0 mt-1 sm:mt-0">
+              <span class="px-2.5 py-1 border rounded-full text-[10px] uppercase font-bold whitespace-nowrap"
                     [ngClass]="statusMeta(task.status).classes">
                 <i class="pi text-[10px] mr-1" [ngClass]="statusMeta(task.status).icon"></i>{{ statusMeta(task.status).label }}
               </span>
-              <span class="px-2.5 py-1 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-full text-[10px] uppercase font-bold whitespace-nowrap mt-1 sm:mt-0">
+              <span class="px-2.5 py-1 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-full text-[10px] uppercase tracking-wide font-bold whitespace-nowrap">
                 Difficulty: {{ task.difficulty }}/5
               </span>
+              <button (click)="taskChat.emit(task)" title="Ask AI Tutor"
+                      class="w-7 h-7 rounded-full bg-indigo-50 text-indigo-500 hover:bg-indigo-500 hover:text-white transition-colors flex items-center justify-center border border-indigo-100 shadow-sm shrink-0">
+                <i class="pi pi-sparkles text-xs"></i>
+              </button>
             </div>
           </div>
           <label class="sr-only" [attr.for]="'task-status-' + task.task_id">Task status</label>
