@@ -30,6 +30,7 @@ export class AiChatComponent implements OnInit {
   activeSessionId = signal('');
   showSessions = input<boolean>(true);
   showHeader = input<boolean>(true);
+  extraContext = input<string>('');
   activeTaskId = input<string | undefined>();
   closeChat = output<void>();
 
@@ -110,7 +111,10 @@ export class AiChatComponent implements OnInit {
     this.isLoading.set(true);
     this.scrollToBottom();
 
-    this.agentService.chat(this.sessionId, text, this.activeTaskId()).subscribe({
+    this.agentService.chat(this.sessionId, text, {
+      extraContext: this.extraContext(),
+      taskId: this.activeTaskId(),
+    }).subscribe({
       next: (res) => {
         this.messages.update(msgs => [...msgs, {
           role: 'assistant',

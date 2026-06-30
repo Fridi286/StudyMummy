@@ -147,15 +147,18 @@ async def chat(
     await append_dialog(db, req.session_id, "user", message)
 
     # RAG-Kontext holen (pgvector)
-    rag_context = await rag.retrieve(db, current_user.user_id, req.message)
+    rag_context = await rag.retrieve(db, current_user.user_id, message)
 
     from datetime import datetime
     current_time_str = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
     context = f"HEUTIGES DATUM UND UHRZEIT: {current_time_str}\n\n"
-    
+
     if session.current_task_id:
         context += f"AKTUELLE AUFGABE (task_id): {session.current_task_id}\n(WICHTIG: Wenn du Tools aufrufst, die eine task_id erwarten, nutze diese ID!)\n\n"
-        
+
+    if req.extra_context:
+        context += f"[Aktueller Aufgaben-Kontext]\n{req.extra_context}\n\n"
+
     if rag_context:
         context += rag_context
 
@@ -218,5 +221,3 @@ async def upload_document(
         extracted_tasks=tasks,
         message=f"{len(tasks)} Aufgabe(n) aus '{file.filename}' extrahiert.",
     )
-
-

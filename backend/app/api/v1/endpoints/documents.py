@@ -11,11 +11,23 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 
 from app.db.session import get_async_db
-from app.db.models import User, Document, Task, Quiz, Cheatsheet
+from app.db.models import User, Document, Task, Quiz, Cheatsheet, DocumentChunk
 from app.api.dependencies import get_current_user
 from app.models.document import (
     DocumentResponse, TaskResponse, QuizResponse, CheatsheetResponse,
     TaskStatusUpdate, QuizAttemptRequest, QuizAttemptResponse, DocumentTagsUpdate
+)
+from app.models.practice import (
+    PracticeAnswerRequest,
+    PracticeAnswerResponse,
+    PracticeTaskRequest,
+    PracticeTaskResponse,
+)
+from app.services.practice_service import (
+    PRACTICE_REWARD_COINS,
+    create_practice_task,
+    evaluate_practice_answer,
+    get_practice_task,
 )
 from app.services.document_analyzer import analyze_document_background_task
 from app.websockets.manager import manager
@@ -164,6 +176,122 @@ async def update_document_tags(
     await db.refresh(document)
     
     return document
+
+
+@router.post("/practice/generate", response_model=PracticeTaskResponse)
+async def generate_practice_task(
+    request: PracticeTaskRequest,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(get_current_user)
+):
+    document_ids = list(dict.fromkeys(request.document_ids))
+    if not document_ids:
+        raise HTTPException(status_code=400, detail="Select at least one document for practice.")
+
+    docs_stmt = select(Document).where(
+        Document.user_id == current_user.user_id,
+        Document.document_id.in_(document_ids)
+    )
+    docs = (await db.execute(docs_stmt)).scalars().all()
+    if len(docs) != len(document_ids):
+        raise HTTPException(status_code=403, detail="One or more documents are not available for this user.")
+
+    chunk_filters = [
+        DocumentChunk.user_id == current_user.user_id,
+        DocumentChunk.document_id.in_(document_ids),
+    ]
+    chunks = []
+
+    if request.text_filter.strip():
+        text_pattern = f"%{request.text_filter.strip()}%"
+        matching_chunks_stmt = (
+            select(DocumentChunk)
+            .where(*chunk_filters, DocumentChunk.text.ilike(text_pattern))
+            .order_by(func.random())
+            .limit(8)
+        )
+        chunks = (await db.execute(matching_chunks_stmt)).scalars().all()
+
+    if not chunks:
+        random_chunks_stmt = (
+            select(DocumentChunk)
+            .where(*chunk_filters)
+            .order_by(func.random())
+            .limit(8)
+        )
+        chunks = (await db.execute(random_chunks_stmt)).scalars().all()
+
+    if chunks:
+        context = "\n\n---\n\n".join(
+            f"[{chunk.document_id} / Chunk {chunk.chunk_index}]\n{chunk.text}" for chunk in chunks
+        )
+    else:
+        context = "\n\n".join(
+            f"Dokument: {doc.file_name}\nTags: {', '.join(doc.tags or []) or 'keine Tags'}"
+            for doc in docs
+        )
+
+    state = await create_practice_task(
+        context=context,
+        difficulty=request.difficulty,
+        tags=request.tags,
+        text_filter=request.text_filter,
+        source_document_ids=document_ids,
+        user_id=current_user.user_id,
+    )
+
+    return PracticeTaskResponse(
+        practice_task_id=state.practice_task_id,
+        task_type=state.task_type,
+        context_excerpt=state.context_excerpt,
+        question=state.question,
+        options=state.options,
+        difficulty=state.difficulty,
+        key_concepts=state.key_concepts,
+        source_document_ids=state.source_document_ids,
+        reward_coins=PRACTICE_REWARD_COINS,
+    )
+
+
+@router.post("/practice/answer", response_model=PracticeAnswerResponse)
+async def submit_practice_answer(
+    request: PracticeAnswerRequest,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(get_current_user)
+):
+    state = get_practice_task(request.practice_task_id, current_user.user_id)
+    if not state:
+        raise HTTPException(status_code=404, detail="Practice task not found.")
+
+    answer_text = request.answer.strip()
+    if not answer_text:
+        raise HTTPException(status_code=400, detail="Answer cannot be empty.")
+
+    evaluation = await evaluate_practice_answer(state, answer_text)
+
+    awarded_coins = 0
+    if evaluation.correct and not state.awarded:
+        awarded_coins = PRACTICE_REWARD_COINS
+        current_user.coins += awarded_coins
+        state.awarded = True
+        db.add(current_user)
+        await db.commit()
+
+        await manager.send_personal_message(current_user.user_id, {
+            "type": "REWARD_GAINED",
+            "coins": awarded_coins,
+            "experience": 0,
+            "total_experience": current_user.experience,
+            "reason": "Practice Task"
+        })
+
+    return PracticeAnswerResponse(
+        practice_task_id=state.practice_task_id,
+        feedback=evaluation.feedback,
+        correct=evaluation.correct,
+        awarded_coins=awarded_coins,
+        reference_answer=state.reference_answer,
+    )
 
 
 @router.get("/{document_id}/tasks", response_model=list[TaskResponse])

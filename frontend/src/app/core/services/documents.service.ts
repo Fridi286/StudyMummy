@@ -67,6 +67,33 @@ export interface QuizAttemptResponse {
   created_at: string;
 }
 
+export interface PracticeTaskRequest {
+  document_ids: string[];
+  difficulty: number;
+  tags: string[];
+  text_filter: string;
+}
+
+export interface PracticeTaskResponse {
+  practice_task_id: string;
+  task_type: 'text' | 'multiple_choice';
+  context_excerpt: string;
+  question: string;
+  options: string[];
+  difficulty: number;
+  key_concepts: string[];
+  source_document_ids: string[];
+  reward_coins: number;
+}
+
+export interface PracticeAnswerResponse {
+  practice_task_id: string;
+  feedback: string;
+  correct: boolean | null;
+  awarded_coins: number;
+  reference_answer: string | null;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -130,5 +157,16 @@ export class DocumentsService {
 
   getQuizAttempts(quizId: string): Observable<QuizAttemptResponse[]> {
     return this.http.get<QuizAttemptResponse[]>(`${this.apiUrl}/quizzes/${quizId}/attempts`);
+  }
+
+  generatePracticeTask(request: PracticeTaskRequest): Observable<PracticeTaskResponse> {
+    return this.http.post<PracticeTaskResponse>(`${this.apiUrl}/practice/generate`, request);
+  }
+
+  submitPracticeAnswer(practiceTaskId: string, answer: string): Observable<PracticeAnswerResponse> {
+    return this.http.post<PracticeAnswerResponse>(`${this.apiUrl}/practice/answer`, {
+      practice_task_id: practiceTaskId,
+      answer,
+    });
   }
 }
