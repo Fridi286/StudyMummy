@@ -9,6 +9,7 @@ from app.models.agent import (
     QuizRequest, QuizResponse,
     CheatsheetRequest, CheatsheetResponse,
 )
+from app.services.llm_service import LLMService, build_tutor_system_prompt, filter_user_input
 from app.services.llm_service import LLMService, filter_user_input
 from app.services.rag_service import RAGService, get_rag_service
 from app.core.context import current_user_id
@@ -18,7 +19,7 @@ from app.api.dependencies import get_current_user
 from app.db.models import User
 from app.services.session_service import (
     get_or_create_session, append_dialog,
-    get_dialog_as_messages,
+    get_dialog_as_messages, update_session_context,
 )
 from app.core.logging import get_logger, get_trace_id
 from app.db.models import Session as DbSession, ChatLog
@@ -29,6 +30,24 @@ router = APIRouter(prefix="/agent", tags=["Agent"])
 
 _llm = LLMService()
 CHAT_ALLOWED_TOOL_NAMES = ("evaluate_answer", "award_coins_and_exp", "add_calendar_note")
+
+
+def _infer_help_level(message: str, current_level: int) -> int:
+    text = message.lower()
+    solution_markers = ("lösung", "loesung", "musterlösung", "musterloesung", "auflösen", "aufloesen")
+    step_markers = ("schritt", "step by step", "rechne vor", "vormachen")
+    hint_markers = ("hint", "hinweis", "tipp", "hilfe", "hilf")
+    stuck_markers = ("weiß nicht", "weiss nicht", "keine ahnung", "verstehe nicht", "komme nicht weiter")
+
+    if any(marker in text for marker in solution_markers):
+        return 4
+    if any(marker in text for marker in step_markers):
+        return max(current_level, 3)
+    if any(marker in text for marker in hint_markers):
+        return min(4, max(current_level + 1, 2))
+    if any(marker in text for marker in stuck_markers):
+        return min(4, current_level + 1)
+    return min(4, max(1, current_level))
 
 
 @router.get("/sessions", summary="List user's chat sessions")
@@ -114,6 +133,15 @@ async def chat(
 
     # Working Memory auffrischen
     session = await get_or_create_session(db, req.session_id, current_user.user_id, req.task_id)
+    help_level = _infer_help_level(req.message, session.help_level)
+    active_task_id = req.task_id or session.current_task_id
+    session = await update_session_context(
+        db,
+        req.session_id,
+        current_user.user_id,
+        current_task_id=active_task_id,
+        help_level=help_level,
+    )
 
     # Nachricht ins Gedächtnis
     await append_dialog(db, req.session_id, "user", message)
@@ -140,6 +168,11 @@ async def chat(
     # LLM-Aufruf mit Tool Use
     reply, tools_called = await _llm.chat_with_tools(
         messages=messages,
+        system_prompt=build_tutor_system_prompt(
+            help_level=session.help_level,
+            user_id=current_user.user_id,
+            task_id=session.current_task_id,
+        ),
         extra_context=context or None,
         allowed_tool_names=CHAT_ALLOWED_TOOL_NAMES,
     )

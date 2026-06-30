@@ -60,6 +60,32 @@ async def append_dialog(db: AsyncSession, session_id: str, role: str, content: s
     await db.commit()
 
 
+async def update_session_context(
+    db: AsyncSession,
+    session_id: str,
+    user_id: str,
+    current_task_id: str | None = None,
+    help_level: int | None = None,
+) -> WorkingMemory:
+    await get_or_create_session(db, session_id, user_id)
+
+    values: dict[str, str | int | None] = {}
+    if current_task_id is not None:
+        values["current_task_id"] = current_task_id
+    if help_level is not None:
+        values["help_level"] = min(4, max(1, help_level))
+
+    if values:
+        await db.execute(
+            update(Session)
+            .where(Session.session_id == session_id, Session.user_id == user_id)
+            .values(**values)
+        )
+        await db.commit()
+
+    return await get_or_create_session(db, session_id, user_id)
+
+
 async def get_dialog_as_messages(db: AsyncSession, session_id: str, user_id: str) -> list[ChatCompletionMessageParam]:
     wm = await get_or_create_session(db, session_id, user_id)
     messages: list[ChatCompletionMessageParam] = []

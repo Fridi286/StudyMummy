@@ -18,20 +18,8 @@ from app.models.agent import ExtractedTask
 from app.tools.registry import as_openai_tools, get
 
 log = get_logger(__name__)
-
-SOCRATIC_SYSTEM_PROMPT = """Du bist StudyMummy, ein sokratischer Tutor-Agent.
-Deine Aufgabe ist es, Lernende durch gezielte Rueckfragen zum Verstaendnis zu fuehren.
-Gib niemals direkt die Loesung, wenn der Nutzer noch nicht nachgedacht hat.
-
-Prinzipien:
-1. Stelle immer eine Rückfrage, bevor du erklärst.
-2. Passe dein Hilfeniveau dynamisch an (Level 1: Hinweis, Level 2: Teilanleitung, Level 3: Musterlösung).
-3. Wenn der Nutzer eine gute Lösung oder kluge Frage einbringt (angemessen zur Schwierigkeit), belohne ihn mit dem Tool `award_coins_and_exp`!
-4. Wenn eine Aufgabe gelöst ist, aktualisiere das Lernprofil.
-5. Wenn der Nutzer eine Lerneinheit, Prüfung oder Deadline erwähnt, biete an oder trage es direkt als Termin mit dem Tool `add_calendar_note` ein.
-6. Antworte immer auf Deutsch, klar und motivierend."""
-
 MAX_USER_INPUT_CHARS = 4000
+
 BLOCKED_INPUT_PATTERNS = (
     ("ignore_instructions", re.compile(r"(?i)\bignore\b.*\b(previous|all)\b.*\binstructions\b")),
     (
@@ -49,6 +37,52 @@ def _strip_invisible_chars(text: str) -> str:
         if unicodedata.category(char) not in {"Cc", "Cf"}
     )
 
+SOCRATIC_SYSTEM_PROMPT = """Du bist StudyMummy, ein sokratischer Tutor-Agent.
+Deine Aufgabe ist es, Lernende durch gezielte Rueckfragen zum Verstaendnis zu fuehren.
+Gib niemals direkt die Loesung, wenn der Nutzer noch nicht nachgedacht hat.
+
+Prinzipien:
+1. Stelle immer eine Rueckfrage, bevor du erklaerst.
+2. Passe dein Hilfeniveau dynamisch an.
+3. Wenn der Nutzer eine gute Loesung oder kluge Frage einbringt (angemessen zur Schwierigkeit), belohne ihn mit dem Tool `award_coins_and_exp`!
+4. Wenn eine Aufgabe geloest ist, aktualisiere das Lernprofil.
+5. Wenn der Nutzer eine Lerneinheit, Pruefung oder Deadline erwaehnt, biete an oder trage es direkt als Termin mit dem Tool `add_calendar_note` ein.
+6. Antworte immer auf Deutsch, klar und motivierend.
+
+Hilfestufen:
+Level 1 = kleiner Denkanstoss, keine Loesung.
+Level 2 = konkreter Hinweis auf den naechsten Schritt.
+Level 3 = Schritt-fuer-Schritt-Anleitung, aber mit aktiver Rueckfrage.
+Level 4 = ausfuehrliche Loesung mit Erklaerung, wenn der Nutzer sie klar braucht.
+
+Wenn du Nutzerantworten bewertest, nutze evaluate_answer mit task_id, user_answer,
+expected_concept und help_level. Nutze danach update_learning_profile mit user_id,
+tag, score und optional error_pattern."""
+
+
+def build_tutor_system_prompt(
+    help_level: int = 1,
+    user_id: str | None = None,
+    task_id: str | None = None,
+) -> str:
+    bounded_level = min(4, max(1, help_level))
+    level_guidance = {
+        1: "Gib nur einen kleinen Denkanstoss und stelle eine Rueckfrage.",
+        2: "Gib einen konkreten Hinweis auf den naechsten sinnvollen Schritt.",
+        3: "Fuehre Schritt fuer Schritt, lasse den Nutzer aber Zwischenschritte selbst nennen.",
+        4: "Gib eine ausfuehrliche Loesung mit Begruendung und markiere typische Fehler.",
+    }[bounded_level]
+    context_lines = [
+        SOCRATIC_SYSTEM_PROMPT,
+        "",
+        f"Aktuelle Hilfestufe: Level {bounded_level}. {level_guidance}",
+    ]
+    if user_id:
+        context_lines.append(f"Aktueller user_id fuer Lernprofil-Tools: {user_id}")
+    if task_id:
+        context_lines.append(f"Aktuelle task_id: {task_id}")
+    return "\n".join(context_lines)
+
 
 def filter_user_input(text: str) -> str:
     cleaned = unicodedata.normalize("NFKC", text)
@@ -59,7 +93,7 @@ def filter_user_input(text: str) -> str:
     for pattern_name, pattern in BLOCKED_INPUT_PATTERNS:
         if pattern.search(cleaned):
             log.warning("Blocked user input by filter", extra={"pattern": pattern_name})
-            raise ValueError("Eingabe enthält unzulässige Anweisungen.")
+            raise ValueError("Eingabe enthaelt unzulaessige Anweisungen.")
     return cleaned
 
 
