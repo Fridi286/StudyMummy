@@ -12,6 +12,7 @@ import { CasinoComponent } from './features/casino/casino.component';
 import { DocumentsComponent } from './features/documents/documents.component';
 import { Learn } from './features/learn/learn';
 import { CalendarComponent } from './features/calendar/calendar.component';
+import { PracticeComponent } from './features/practice/practice.component';
 
 export const routes: Routes = [
   { path: 'login', component: LoginComponent },
@@ -24,6 +25,7 @@ export const routes: Routes = [
   { path: 'casino', component: CasinoComponent, canActivate: [authGuard] },
   { path: 'documents', component: DocumentsComponent, canActivate: [authGuard] },
   { path: 'learn', component: Learn, canActivate: [authGuard] },
+  { path: 'practice', component: PracticeComponent, canActivate: [authGuard] },
   { path: 'calendar', component: CalendarComponent, canActivate: [authGuard] },
   { path: '', redirectTo: 'learn', pathMatch: 'full' },
   { path: '**', redirectTo: '' },
