@@ -4,8 +4,8 @@ LLM service for chat, tool use, and task extraction.
 import json
 import re
 import time
-from typing import Any, Iterable, cast
-
+import unicodedata
+from typing import Iterable, cast, Any
 from openai import AsyncOpenAI
 from openai.types.chat import (
     ChatCompletionContentPartParam,
@@ -33,19 +33,32 @@ Prinzipien:
 
 MAX_USER_INPUT_CHARS = 4000
 BLOCKED_INPUT_PATTERNS = (
-    re.compile(r"(?i)\bignore\b.*\b(previous|all)\b.*\binstructions\b"),
-    re.compile(r"(?i)\b(reveal|show|print)\b.*\b(system prompt|developer message|hidden prompt)\b"),
-    re.compile(r"(?i)\bdeveloper message\b"),
+    ("ignore_instructions", re.compile(r"(?i)\bignore\b.*\b(previous|all)\b.*\binstructions\b")),
+    (
+        "reveal_prompt",
+        re.compile(r"(?i)\b(reveal|show|print)\b.*\b(system prompt|developer message|hidden prompt)\b"),
+    ),
+    ("developer_message", re.compile(r"(?i)\bdeveloper message\b")),
 )
 
 
+def _strip_invisible_chars(text: str) -> str:
+    return "".join(
+        char
+        for char in text
+        if unicodedata.category(char) not in {"Cc", "Cf"}
+    )
+
+
 def filter_user_input(text: str) -> str:
-    cleaned = text.replace("\x00", "").strip()
-    cleaned = re.sub(r"\s+", " ", cleaned)
+    cleaned = unicodedata.normalize("NFKC", text)
+    cleaned = _strip_invisible_chars(cleaned.replace("\x00", ""))
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
     if len(cleaned) > MAX_USER_INPUT_CHARS:
         raise ValueError("Eingabe ist zu lang.")
-    for pattern in BLOCKED_INPUT_PATTERNS:
+    for pattern_name, pattern in BLOCKED_INPUT_PATTERNS:
         if pattern.search(cleaned):
+            log.warning("Blocked user input by filter", extra={"pattern": pattern_name})
             raise ValueError("Eingabe enthält unzulässige Anweisungen.")
     return cleaned
 

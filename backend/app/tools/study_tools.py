@@ -177,7 +177,7 @@ async def _award_coins_and_exp(amount: int, reason: str, task_id: str | None = N
             stmt_task = select(Task).join(Document).where(
                 Task.task_id == task_id,
                 Document.user_id == user_id
-            )
+            ).with_for_update()
             task = (await db.execute(stmt_task)).scalars().first()
             if not task:
                 return {"error": f"Aufgabe '{task_id}' nicht gefunden. Belohnung abgelehnt."}
@@ -185,6 +185,7 @@ async def _award_coins_and_exp(amount: int, reason: str, task_id: str | None = N
                 return {"error": f"Aufgabe '{task_id}' wurde bereits belohnt. Kein Cheating!"}
 
             task.is_rewarded = True
+            await db.flush()
         else:
             # Guardrail 4: If no task_id, limit to max 10 coins for general good questions
             amount = min(amount, 10)
