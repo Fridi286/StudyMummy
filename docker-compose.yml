@@ -36,6 +36,7 @@ services:
       - OPENAI_MODEL=${OPENAI_MODEL}
       - HAW_ICC_API_KEY=${HAW_ICC_API_KEY}
       - HAW_ICC_BASE_URL=${HAW_ICC_BASE_URL}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-}
     depends_on:
       db:
         condition: service_healthy

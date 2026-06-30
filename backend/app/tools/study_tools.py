@@ -151,13 +151,13 @@ async def _award_coins_and_exp(amount: int, reason: str, task_id: str | None = N
     """Real: vergibt Münzen und Erfahrungspunkte (mit aktiven Multiplikatoren)."""
     # Guardrail 1: Limit amount to between 1 and 100 to prevent abuse
     amount = max(1, min(100, amount))
-    
+
     user_id = current_user_id.get()
     if not user_id:
         return {"error": "Kein user_id im Kontext"}
 
     log.info("award_coins_and_exp called", extra={"user_id": user_id, "amount": amount, "task_id": task_id})
-    
+
     async with AsyncSessionLocal() as db:
         # Guardrail 2: Check if user is begging for coins (Prompt Injection)
         stmt_log = select(ChatLog).join(Session).where(
@@ -165,7 +165,7 @@ async def _award_coins_and_exp(amount: int, reason: str, task_id: str | None = N
             ChatLog.role == "user"
         ).order_by(ChatLog.timestamp.desc()).limit(1)
         last_msg = (await db.execute(stmt_log)).scalars().first()
-        
+
         if last_msg:
             msg_lower = last_msg.content.lower()
             cheat_words = ["coin", "münze", "belohn", "award", "exp", "erfahrung", "cheat", "ignore prompt"]
@@ -175,16 +175,17 @@ async def _award_coins_and_exp(amount: int, reason: str, task_id: str | None = N
         # Guardrail 3: Verify Task if task_id is provided
         if task_id:
             stmt_task = select(Task).join(Document).where(
-                Task.task_id == task_id, 
+                Task.task_id == task_id,
                 Document.user_id == user_id
-            )
+            ).with_for_update()
             task = (await db.execute(stmt_task)).scalars().first()
             if not task:
                 return {"error": f"Aufgabe '{task_id}' nicht gefunden. Belohnung abgelehnt."}
             if task.is_rewarded:
                 return {"error": f"Aufgabe '{task_id}' wurde bereits belohnt. Kein Cheating!"}
-            
+
             task.is_rewarded = True
+            await db.flush()
         else:
             # Guardrail 4: If no task_id, limit to max 10 coins for general good questions
             amount = min(amount, 10)

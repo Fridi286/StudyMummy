@@ -6,7 +6,7 @@ import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { MenuModule } from 'primeng/menu';
 import { MenuItem } from 'primeng/api';
 import { ChatService } from '../../core/services/chat.service';
-import { DocumentsService, TaskResponse, QuizResponse, CheatsheetResponse, DocumentResponse, QuizAttemptResponse } from '../../core/services/documents.service';
+import { DocumentsService, TaskResponse, TaskStatus, QuizResponse, CheatsheetResponse, DocumentResponse, QuizAttemptResponse } from '../../core/services/documents.service';
 import { SoundService } from '../../core/services/sound.service';
 import { finalize } from 'rxjs/operators';
 import confetti from 'canvas-confetti';
@@ -81,6 +81,24 @@ export class Learn implements OnInit {
 
         // Refresh documents to show the new one, and select it
         this.fetchDocuments(docId);
+        this.messageService.add({
+          severity: 'success',
+          summary: 'Analysis Complete',
+          detail: 'Tasks, quizzes, and cheatsheet are ready.'
+        });
+      }
+    }, { allowSignalWrites: true });
+
+    effect(() => {
+      const failure = this.chatService.latestDocumentAnalysisFailed();
+      if (failure) {
+        this.isAnalyzing.set(false);
+        this.fetchDocuments();
+        this.messageService.add({
+          severity: 'error',
+          summary: 'Analysis Failed',
+          detail: failure.message
+        });
       }
     }, { allowSignalWrites: true });
 
@@ -93,7 +111,7 @@ export class Learn implements OnInit {
           icon: 'pi pi-comments',
           command: () => chat.loadSession(s)
         }));
-        
+
         if (items.length === 0) {
           this.chatMenuItems.set([{ label: 'No recent chats', disabled: true }]);
         } else {
@@ -128,7 +146,7 @@ export class Learn implements OnInit {
     if (this.isResizing()) {
       const deltaX = this.dragStartX - event.clientX;
       const newWidth = this.dragStartWidth + deltaX;
-      
+
       const maxAvailableWidth = containerWidth - gapSpace - minCenterWidth - (this.isLibraryExpanded() ? this.libraryPanelWidth() : 0);
       const actualMax = Math.min(800, Math.max(300, maxAvailableWidth));
 
@@ -142,10 +160,10 @@ export class Learn implements OnInit {
     } else if (this.isLibraryResizing()) {
       const deltaX = event.clientX - this.libDragStartX;
       const newWidth = this.libDragStartWidth + deltaX;
-      
+
       const maxAvailableWidth = containerWidth - gapSpace - minCenterWidth - (this.isChatExpanded() ? this.chatPanelWidth() : 0);
       const actualMax = Math.min(600, Math.max(250, maxAvailableWidth));
-      
+
       if (newWidth >= 250 && newWidth <= actualMax) {
         this.libraryPanelWidth.set(newWidth);
       } else if (newWidth > actualMax) {
@@ -229,11 +247,14 @@ export class Learn implements OnInit {
 
   private fetchGeneratedArtifacts(documentId: string) {
     this.documentsService.getDocumentTasks(documentId).subscribe(tasks => {
-      // Sort tasks: open first, completed last
+      const statusOrder: Record<TaskStatus, number> = {
+        open: 0,
+        in_progress: 1,
+        repeat: 2,
+        solved: 3
+      };
       const sorted = [...tasks].sort((a, b) => {
-        if (a.status === 'completed' && b.status !== 'completed') return 1;
-        if (a.status !== 'completed' && b.status === 'completed') return -1;
-        return 0;
+        return statusOrder[a.status] - statusOrder[b.status];
       });
       this.generatedTasks.set(sorted);
     });
@@ -266,14 +287,20 @@ export class Learn implements OnInit {
 
   // --- Task Logic ---
   toggleTaskCompletion(task: TaskResponse) {
-    const newStatus = task.status === 'completed' ? 'open' : 'completed';
+    const newStatus = task.status === 'solved' ? 'open' : 'solved';
+    this.updateTaskStatus(task, newStatus);
+  }
+
+  updateTaskStatus(task: TaskResponse, newStatus: TaskStatus) {
+    if (task.status === newStatus) return;
+
     // Optimistically update
     this.generatedTasks.update(tasks => tasks.map(t => t.task_id === task.task_id ? { ...t, status: newStatus } : t));
 
     this.documentsService.updateTaskStatus(task.task_id, newStatus).subscribe({
       next: (updatedTask) => {
         // Only fire confetti if completing the task
-        if (newStatus === 'completed') {
+        if (newStatus === 'solved') {
           this.fireConfetti('good');
         }
         // Update the task with backend state (which includes is_rewarded if applicable)
@@ -334,14 +361,14 @@ export class Learn implements OnInit {
               [quiz.quiz_id]: [attempt, ...existing]
             };
           });
-          
+
           let performance: 'perfect' | 'good' | 'bad' = 'bad';
           if (attempt.score === attempt.total_questions) {
             performance = 'perfect';
           } else if (attempt.score >= attempt.total_questions / 2) {
             performance = 'good';
           }
-          
+
           this.fireConfetti(performance);
         },
         error: () => {

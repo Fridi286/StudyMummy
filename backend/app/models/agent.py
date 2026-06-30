@@ -9,6 +9,7 @@ class ChatRequest(BaseModel):
     session_id: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
     message: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
     task_id: Optional[str] = None
+    extra_context: Optional[str] = None
 
 
 class ChatResponse(BaseModel):

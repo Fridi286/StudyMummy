@@ -33,7 +33,7 @@ async def get_or_create_session(db: AsyncSession, session_id: str, user_id: str,
         if task_id and db_session.current_task_id != task_id:
             db_session.current_task_id = task_id
             await db.commit()
-            
+
         chat_logs = db_session.chat_logs or []
 
     dialog_history = [
