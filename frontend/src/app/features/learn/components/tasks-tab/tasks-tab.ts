@@ -12,4 +12,5 @@ import { TaskResponse } from '../../../../core/services/documents.service';
 export class TasksTab {
   tasks = input.required<TaskResponse[]>();
   taskToggle = output<TaskResponse>();
+  taskChat = output<TaskResponse>();
 }

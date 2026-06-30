@@ -93,7 +93,7 @@
           }
 
           @if (activeTab() === 'tasks') {
-          <app-tasks-tab class="block w-full h-full min-h-0" [tasks]="generatedTasks()" (taskToggle)="toggleTaskCompletion($event)">
+          <app-tasks-tab class="block w-full h-full min-h-0" [tasks]="generatedTasks()" (taskToggle)="toggleTaskCompletion($event)" (taskChat)="openChatForTask($event)">
           </app-tasks-tab>
           }
 
@@ -147,7 +147,7 @@
            </div>
 
            <div class="flex-1 overflow-hidden relative pt-1 px-1 pb-1">
-             <app-ai-chat #aiChat [showSessions]="false" [showHeader]="false" (closeChat)="isChatExpanded.set(false)"></app-ai-chat>
+             <app-ai-chat #aiChat [showSessions]="false" [showHeader]="false" [activeTaskId]="activeChatTaskId()" (closeChat)="isChatExpanded.set(false)"></app-ai-chat>
            </div>
            </div>
       </div>

@@ -113,9 +113,7 @@ async def chat(
     current_user_id.set(current_user.user_id)
 
     # Working Memory auffrischen
-    session = await get_or_create_session(db, req.session_id, current_user.user_id)
-    if req.task_id:
-        session.current_task_id = req.task_id
+    session = await get_or_create_session(db, req.session_id, current_user.user_id, req.task_id)
 
     # Nachricht ins Gedächtnis
     await append_dialog(db, req.session_id, "user", message)
@@ -126,6 +124,10 @@ async def chat(
     from datetime import datetime
     current_time_str = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
     context = f"HEUTIGES DATUM UND UHRZEIT: {current_time_str}\n\n"
+    
+    if session.current_task_id:
+        context += f"AKTUELLE AUFGABE (task_id): {session.current_task_id}\n(WICHTIG: Wenn du Tools aufrufst, die eine task_id erwarten, nutze diese ID!)\n\n"
+        
     if rag_context:
         context += rag_context
 
