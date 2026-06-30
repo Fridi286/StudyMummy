@@ -226,7 +226,7 @@ async def update_task_status(
     # doc = (await db.execute(stmt)).scalars().first()
     # if doc.user_id != current_user.user_id: raise HTTPException(status_code=403, detail="Forbidden")
 
-    if update.status == "completed" and not task.is_rewarded:
+    if update.status == "solved" and not task.is_rewarded:
         reward = task.difficulty * 10
         
         # Calculate xp multiplier from active items
