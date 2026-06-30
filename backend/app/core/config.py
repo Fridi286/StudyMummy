@@ -28,6 +28,8 @@ class Settings(BaseSettings):
     openai_base_url: str | None = None
     openai_model: str = "gpt-4o-mini"
     openai_temperature: float = 0.3
+    openai_timeout_seconds: float = 20.0
+    openai_max_retries: int = 0
 
     # HAW ICC Fallback
     haw_icc_api_key: str | None = None
@@ -45,6 +47,10 @@ class Settings(BaseSettings):
     # RAG
     chroma_persist_dir: str = "./data/chroma"
     embedding_model: str = "text-embedding-3-small"
+
+    @property
+    def rag_embeddings_enabled(self) -> bool:
+        return bool(self.embedding_model.strip())
 
     # Database
     database_url: str = "postgresql://postgres:postgres@localhost:5432/studymummy"

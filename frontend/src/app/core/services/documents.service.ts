@@ -11,13 +11,15 @@ export interface DocumentResponse {
   uploaded_at: string;
 }
 
+export type TaskStatus = 'open' | 'in_progress' | 'solved' | 'repeat';
+
 export interface TaskResponse {
   task_id: string;
   document_id: string;
   difficulty: number;
   task_text: string;
   key_concepts: string[];
-  status: string;
+  status: TaskStatus;
   created_at: string;
 }
 
@@ -49,7 +51,7 @@ export interface CheatsheetResponse {
 }
 
 export interface TaskStatusUpdate {
-  status: string;
+  status: TaskStatus;
 }
 
 export interface QuizAttemptRequest {
@@ -145,7 +147,7 @@ export class DocumentsService {
     return this.http.get<CheatsheetResponse[]>(`${this.apiUrl}/${documentId}/cheatsheets`);
   }
 
-  updateTaskStatus(taskId: string, status: string): Observable<TaskResponse> {
+  updateTaskStatus(taskId: string, status: TaskStatus): Observable<TaskResponse> {
     return this.http.put<TaskResponse>(`${this.apiUrl}/tasks/${taskId}/status`, { status });
   }
 

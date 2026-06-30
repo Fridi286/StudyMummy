@@ -12,6 +12,7 @@ export interface ChatRequest {
   session_id: string;
   message: string;
   extra_context?: string;
+  task_id?: string;
 }
 
 export interface ChatResponse {
@@ -28,17 +29,25 @@ export interface SessionInfo {
   active: boolean;
 }
 
+export interface ChatContextOptions {
+  extraContext?: string;
+  taskId?: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AgentService {
   private http = inject(HttpClient);
   private apiUrl = 'http://localhost:8000/api/v1/agent';
 
-  chat(sessionId: string, message: string, extraContext = ''): Observable<ChatResponse> {
-    return this.http.post<ChatResponse>(`${this.apiUrl}/chat`, {
+  chat(sessionId: string, message: string, options: ChatContextOptions = {}): Observable<ChatResponse> {
+    const request: ChatRequest = {
       session_id: sessionId,
       message,
-      extra_context: extraContext || undefined,
-    });
+      extra_context: options.extraContext || undefined,
+      task_id: options.taskId || undefined,
+    };
+
+    return this.http.post<ChatResponse>(`${this.apiUrl}/chat`, request);
   }
 
   listSessions(): Observable<SessionInfo[]> {

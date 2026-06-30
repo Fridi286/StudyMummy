@@ -1,4 +1,5 @@
 import os
+import subprocess
 import uuid
 import pymupdf  # PyMuPDF
 import typing
@@ -24,6 +25,17 @@ client = AsyncOpenAI(
     base_url=settings.openai_base_url,
 )
 
+
+async def _notify_document_analysis(user_id: str, document_id: str, success: bool, message: str) -> None:
+    event_type = "DOCUMENT_ANALYZED" if success else "DOCUMENT_ANALYSIS_FAILED"
+    payload = {
+        "type": event_type,
+        "message": document_id if success else message,
+        "document_id": document_id,
+    }
+    await manager.send_personal_message(user_id, payload)
+
+
 def _extract_text_from_file(file_path: str) -> str:
     """
     Helper function to extract text from a file based on its extension.
@@ -31,19 +43,58 @@ def _extract_text_from_file(file_path: str) -> str:
     full_text = ""
     ext = os.path.splitext(file_path)[1].lower()
     text_extensions = {".txt", ".md", ".csv", ".json", ".xml", ".html", ".py", ".js", ".ts", ".css"}
+    image_extensions = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff", ".tif"}
     
     if ext in text_extensions:
         with open(file_path, "r", encoding="utf-8") as f:
             full_text = f.read()
+    elif ext in image_extensions:
+        full_text = _extract_text_from_image(file_path)
     else:
         # Fallback to PyMuPDF for complex formats like PDF, EPUB, etc.
         doc = pymupdf.open(file_path)
         for i in range(len(doc)):
             page = typing.cast(pymupdf.Page, doc[i])
-            full_text += str(page.get_text("text")) + "\n"
+            page_text = str(page.get_text("text"))
+            if not page_text.strip():
+                page_text = _extract_text_from_pdf_page_with_ocr(page)
+            full_text += page_text + "\n"
         doc.close()
         
     return full_text
+
+
+def _extract_text_from_image(file_path: str) -> str:
+    """
+    Best-effort OCR for screenshots and scanned exercise images.
+    """
+    try:
+        result = subprocess.run(
+            ["tesseract", file_path, "stdout", "-l", "deu+eng"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if result.returncode != 0:
+            log.warning(f"OCR for image failed: {result.stderr.strip()}")
+            return ""
+        return result.stdout
+    except Exception as e:
+        log.warning(f"OCR for image failed or is unavailable: {e}")
+        return ""
+
+
+def _extract_text_from_pdf_page_with_ocr(page: pymupdf.Page) -> str:
+    """
+    Best-effort OCR fallback for scanned PDF pages.
+    """
+    try:
+        textpage = page.get_textpage_ocr()
+        return str(page.get_text("text", textpage=textpage))
+    except Exception as e:
+        log.warning(f"OCR for PDF page failed or is unavailable: {e}")
+        return ""
 
 async def analyze_document_background_task(
     document_id: str,
@@ -62,10 +113,22 @@ async def analyze_document_background_task(
             full_text = _extract_text_from_file(file_path)
         except Exception as e:
             log.error(f"Failed to extract text from {file_path}: {e}")
+            await _notify_document_analysis(
+                user_id,
+                document_id,
+                False,
+                "The uploaded file could not be read. Please try a PDF, text file, or a clearer image.",
+            )
             return
 
         if not full_text.strip():
             log.warning("Extracted text is empty.")
+            await _notify_document_analysis(
+                user_id,
+                document_id,
+                False,
+                "No readable text was found in this upload. Please try a text-based PDF, text file, or clearer screenshot.",
+            )
             return
             
         # Limit text length to prevent massive token usage for now (e.g. max 20,000 chars)
@@ -103,40 +166,43 @@ async def analyze_document_background_task(
             log.error(f"Failed to update document tags: {e}")
 
         # 1.5 Generate Embeddings and Chunks for RAG
-        log.info("Generating embeddings and chunks for RAG...")
-        try:
-            # Simple chunking: split to ~1000 characters
-            chunk_size = 1000
-            chunks = textwrap.wrap(full_text, chunk_size, break_long_words=False, replace_whitespace=False)
-            
-            batch_size = 100
-            chunk_index = 0
-            for i in range(0, len(chunks), batch_size):
-                batch = chunks[i:i + batch_size]
-                batch = [c.strip() for c in batch if c.strip()]
-                if not batch:
-                    continue
-                    
-                response = await client.embeddings.create(
-                    input=batch,
-                    model="text-embedding-3-small"
-                )
+        if settings.rag_embeddings_enabled:
+            log.info("Generating embeddings and chunks for RAG...")
+            try:
+                # Simple chunking: split to ~1000 characters
+                chunk_size = 1000
+                chunks = textwrap.wrap(full_text, chunk_size, break_long_words=False, replace_whitespace=False)
                 
-                for j, data in enumerate(response.data):
-                    new_chunk = DocumentChunk(
-                        chunk_id=str(uuid.uuid4()),
-                        document_id=document_id,
-                        user_id=user_id,
-                        text=batch[j],
-                        embedding=data.embedding,
-                        chunk_index=chunk_index
+                batch_size = 100
+                chunk_index = 0
+                for i in range(0, len(chunks), batch_size):
+                    batch = chunks[i:i + batch_size]
+                    batch = [c.strip() for c in batch if c.strip()]
+                    if not batch:
+                        continue
+
+                    response = await client.embeddings.create(
+                        input=batch,
+                        model=settings.embedding_model
                     )
-                    db.add(new_chunk)
-                    chunk_index += 1
-            await db.commit()
-            log.info(f"Saved {chunk_index} document chunks with embeddings.")
-        except Exception as e:
-            log.error(f"Failed to generate embeddings: {e}")
+
+                    for j, data in enumerate(response.data):
+                        new_chunk = DocumentChunk(
+                            chunk_id=str(uuid.uuid4()),
+                            document_id=document_id,
+                            user_id=user_id,
+                            text=batch[j],
+                            embedding=data.embedding,
+                            chunk_index=chunk_index
+                        )
+                        db.add(new_chunk)
+                        chunk_index += 1
+                await db.commit()
+                log.info(f"Saved {chunk_index} document chunks with embeddings.")
+            except Exception as e:
+                log.error(f"Failed to generate embeddings: {e}")
+        else:
+            log.info("RAG embeddings disabled; skipping document chunk embeddings.")
 
         # 2. Generate Tasks
         log.info("Generating Tasks...")
@@ -229,12 +295,16 @@ async def analyze_document_background_task(
         except Exception as e:
             log.error(f"Database commit failed: {e}")
             await db.rollback()
+            await _notify_document_analysis(
+                user_id,
+                document_id,
+                False,
+                "The document was read, but the generated tasks could not be saved. Please try uploading it again.",
+            )
+            return
 
         # 5. Notify Frontend via WebSocket
         log.info("Notifying frontend...")
-        await manager.send_personal_message(user_id, {
-            "type": "DOCUMENT_ANALYZED",
-            "message": document_id
-        })
+        await _notify_document_analysis(user_id, document_id, True, "Document analysis completed.")
         
         log.info(f"Analysis complete for document {document_id}")

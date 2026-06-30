@@ -7,11 +7,10 @@
     <div class="max-w-[1400px] mx-auto h-full flex flex-col xl:flex-row gap-6 lg:gap-8">
 
       <!-- LEFT SIDEBAR: Document History -->
-      <app-study-sidebar class="block z-20"
-        [documents]="documents()" [activeDocument]="activeDocument()" [isAnalyzing]="isAnalyzing()"
-        [isLibraryExpanded]="isLibraryExpanded()" [libraryWidth]="libraryPanelWidth()" [isResizing]="isLibraryResizing()"
-        (fileUpload)="onFileUpload($event)" (documentSelect)="selectDocument($event)" 
-        (documentDownload)="downloadDocument($event)" (documentEditTags)="openEditTags($event)" 
+      <app-study-sidebar class="block z-20" [documents]="documents()" [activeDocument]="activeDocument()"
+        [isAnalyzing]="isAnalyzing()" [isLibraryExpanded]="isLibraryExpanded()" [libraryWidth]="libraryPanelWidth()"
+        [isResizing]="isLibraryResizing()" (fileUpload)="onFileUpload($event)" (documentSelect)="selectDocument($event)"
+        (documentDownload)="downloadDocument($event)" (documentEditTags)="openEditTags($event)"
         (documentDelete)="deleteDocument($event.event, $event.doc)" (toggleLibrary)="isLibraryExpanded.set($event)"
         (resizeStart)="onLibResizeStart($event)">
       </app-study-sidebar>
@@ -39,7 +38,8 @@
         } @else {
 
         <!-- Sleek Tabs Panel & Toggle -->
-        <div class="flex flex-col sm:flex-row items-center justify-between w-full mb-6 z-10 shrink-0 transition-all gap-4">
+        <div
+          class="flex flex-col sm:flex-row items-center justify-between w-full mb-6 z-10 shrink-0 transition-all gap-4">
 
           <div class="flex items-center gap-4 flex-1">
             @if (!isLibraryExpanded()) {
@@ -84,16 +84,18 @@
           class="flex-1 bg-white/80 backdrop-blur-md rounded-3xl border border-slate-200/60 shadow-xl flex flex-col relative overflow-hidden transition-all duration-500 ease-in-out min-h-0">
 
           @if (activeTab() === 'quiz') {
-          <app-quiz-tab class="block w-full h-full min-h-0"
-            [quizzes]="generatedQuizzes()" [quizAttempts]="quizAttempts()"
-            [selectedAnswers]="selectedAnswers()" [isSubmittingQuiz]="isSubmittingQuiz()"
+          <app-quiz-tab class="block w-full h-full min-h-0" [quizzes]="generatedQuizzes()"
+            [quizAttempts]="quizAttempts()" [selectedAnswers]="selectedAnswers()"
+            [isSubmittingQuiz]="isSubmittingQuiz()"
             (answerSelect)="selectAnswer($event.quizId, $event.questionId, $event.option)"
             (quizSubmit)="submitQuiz($event)" (quizRetake)="retakeQuiz($event)">
           </app-quiz-tab>
           }
 
           @if (activeTab() === 'tasks') {
-          <app-tasks-tab class="block w-full h-full min-h-0" [tasks]="generatedTasks()" (taskToggle)="toggleTaskCompletion($event)">
+          <app-tasks-tab class="block w-full h-full min-h-0" [tasks]="generatedTasks()"
+            (taskToggle)="toggleTaskCompletion($event)"
+            (taskStatusChange)="updateTaskStatus($event.task, $event.status)" (taskChat)="openChatForTask($event)">
           </app-tasks-tab>
           }
 
@@ -109,47 +111,54 @@
       @if (activeDocument()) {
       <!-- AI CHAT WRAPPER -->
       <div class="hidden xl:flex relative shrink-0 h-full z-20 transition-all duration-500 ease-in-out origin-right"
-           [ngClass]="isChatExpanded() ? 'xl:opacity-100 xl:scale-x-100' : 'xl:w-0 xl:opacity-0 xl:m-0 xl:scale-x-0'"
-           [class.transition-none]="isResizing()"
-           [style.width.px]="isChatExpanded() ? chatPanelWidth() : null">
-           
-           @if (isChatExpanded()) {
-           <!-- RESIZER HANDLE (Invisible Grab Area) -->
-           <div class="absolute -left-2 top-0 bottom-0 w-4 cursor-col-resize z-50 flex items-center justify-center group"
-                (mousedown)="onResizeStart($event)">
-                <!-- Visual Line -->
-                <div class="w-[3px] h-full bg-transparent group-hover:bg-indigo-300/50 transition-colors flex items-center justify-center"
-                     [ngClass]="{'bg-indigo-500/50': isResizing()}">
-                     <div class="w-[4px] h-10 rounded-full bg-slate-300 group-hover:bg-indigo-400 transition-all shadow-sm"
-                          [ngClass]="{'bg-indigo-500 scale-110': isResizing()}"></div>
-                </div>
-           </div>
+        [ngClass]="isChatExpanded() ? 'xl:opacity-100 xl:scale-x-100' : 'xl:w-0 xl:opacity-0 xl:m-0 xl:scale-x-0'"
+        [class.transition-none]="isResizing()" [style.width.px]="isChatExpanded() ? chatPanelWidth() : null">
 
-           }
+        @if (isChatExpanded()) {
+        <!-- RESIZER HANDLE (Invisible Grab Area) -->
+        <div class="absolute -left-2 top-0 bottom-0 w-4 cursor-col-resize z-50 flex items-center justify-center group"
+          (mousedown)="onResizeStart($event)">
+          <!-- Visual Line -->
+          <div
+            class="w-[3px] h-full bg-transparent group-hover:bg-indigo-300/50 transition-colors flex items-center justify-center"
+            [ngClass]="{'bg-indigo-500/50': isResizing()}">
+            <div class="w-[4px] h-10 rounded-full bg-slate-300 group-hover:bg-indigo-400 transition-all shadow-sm"
+              [ngClass]="{'bg-indigo-500 scale-110': isResizing()}"></div>
+          </div>
+        </div>
 
-           <!-- AI CHAT PANEL CONTENT -->
-           <div class="flex-1 flex flex-col h-full bg-white/90 backdrop-blur-xl rounded-3xl border border-slate-200/60 shadow-xl overflow-hidden min-w-0"
-                [class.pointer-events-none]="isResizing()">
-           
-           <div class="p-6 border-b border-slate-100 bg-white/50 flex justify-between items-center shrink-0">
-             <div class="flex items-center gap-3">
-                 <button (click)="isChatExpanded.set(false)" class="hidden xl:flex text-slate-400 hover:text-slate-600 bg-slate-50 hover:bg-slate-200 rounded-lg w-8 h-8 items-center justify-center transition-colors">
-                   <i class="pi pi-angle-right"></i>
-                 </button>
-                 <button (click)="chatMenu.toggle($event)" class="text-xl font-extrabold text-slate-800 hover:text-indigo-600 transition-colors flex items-center gap-2 group text-left">
-                   <i class="pi pi-sparkles text-indigo-500 group-hover:animate-pulse"></i> AI Tutor <i class="pi pi-chevron-down text-xs text-slate-400 font-bold ml-1"></i>
-                 </button>
-                 <p-menu #chatMenu [popup]="true" [model]="chatMenuItems()" appendTo="body" styleClass="w-64 text-sm max-h-96 overflow-y-auto"></p-menu>
-             </div>
-             <button (click)="aiChat.startNewSession()" pTooltip="New Chat" tooltipPosition="left" class="text-indigo-500 hover:text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg w-8 h-8 flex items-center justify-center transition-colors cursor-pointer">
-               <i class="pi pi-plus"></i>
-             </button>
-           </div>
+        }
 
-           <div class="flex-1 overflow-hidden relative pt-1 px-1 pb-1">
-             <app-ai-chat #aiChat [showSessions]="false" [showHeader]="false" (closeChat)="isChatExpanded.set(false)"></app-ai-chat>
-           </div>
-           </div>
+        <!-- AI CHAT PANEL CONTENT -->
+        <div
+          class="flex-1 flex flex-col h-full bg-white/90 backdrop-blur-xl rounded-3xl border border-slate-200/60 shadow-xl overflow-hidden min-w-0"
+          [class.pointer-events-none]="isResizing()">
+
+          <div class="p-6 border-b border-slate-100 bg-white/50 flex justify-between items-center shrink-0">
+            <div class="flex items-center gap-3">
+              <button (click)="isChatExpanded.set(false)"
+                class="hidden xl:flex text-slate-400 hover:text-slate-600 bg-slate-50 hover:bg-slate-200 rounded-lg w-8 h-8 items-center justify-center transition-colors">
+                <i class="pi pi-angle-right"></i>
+              </button>
+              <button (click)="chatMenu.toggle($event)"
+                class="text-xl font-extrabold text-slate-800 hover:text-indigo-600 transition-colors flex items-center gap-2 group text-left">
+                <i class="pi pi-sparkles text-indigo-500 group-hover:animate-pulse"></i> AI Tutor <i
+                  class="pi pi-chevron-down text-xs text-slate-400 font-bold ml-1"></i>
+              </button>
+              <p-menu #chatMenu [popup]="true" [model]="chatMenuItems()" appendTo="body"
+                styleClass="w-64 text-sm max-h-96 overflow-y-auto"></p-menu>
+            </div>
+            <button (click)="aiChat.startNewSession()" pTooltip="New Chat" tooltipPosition="left"
+              class="text-indigo-500 hover:text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg w-8 h-8 flex items-center justify-center transition-colors cursor-pointer">
+              <i class="pi pi-plus"></i>
+            </button>
+          </div>
+
+          <div class="flex-1 overflow-hidden relative pt-1 px-1 pb-1">
+            <app-ai-chat #aiChat [showSessions]="false" [showHeader]="false" [activeTaskId]="activeChatTaskId()"
+              (closeChat)="isChatExpanded.set(false)"></app-ai-chat>
+          </div>
+        </div>
       </div>
       }
 

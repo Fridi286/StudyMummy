@@ -27,6 +27,9 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     libcairo2 \
+    tesseract-ocr \
+    tesseract-ocr-deu \
+    tesseract-ocr-eng \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy virtual environment from builder

@@ -79,7 +79,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     difficulty INT NOT NULL CHECK (difficulty >= 1 AND difficulty <= 5),
     task_text TEXT NOT NULL,
     key_concepts JSONB DEFAULT '[]'::jsonb,
-    status VARCHAR(50) NOT NULL DEFAULT 'open',
+    status VARCHAR(50) NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'in_progress', 'solved', 'repeat')),
     is_rewarded BOOLEAN DEFAULT FALSE NOT NULL
 );
 

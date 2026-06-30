@@ -12,7 +12,7 @@ from app.core.logging import get_logger
 
 log = get_logger(__name__)
 
-async def get_or_create_session(db: AsyncSession, session_id: str, user_id: str) -> WorkingMemory:
+async def get_or_create_session(db: AsyncSession, session_id: str, user_id: str, task_id: str | None = None) -> WorkingMemory:
     stmt = (
         select(Session)
         .options(selectinload(Session.chat_logs))
@@ -22,13 +22,18 @@ async def get_or_create_session(db: AsyncSession, session_id: str, user_id: str)
     db_session = result.scalars().first()
 
     if not db_session:
-        db_session = Session(session_id=session_id, user_id=user_id)
+        db_session = Session(session_id=session_id, user_id=user_id, current_task_id=task_id)
         db.add(db_session)
         await db.commit()
         await db.refresh(db_session)
         log.info(f"Session created in DB: {session_id}")
         chat_logs = []
     else:
+        # Update the task_id in the database if a new one is provided
+        if task_id and db_session.current_task_id != task_id:
+            db_session.current_task_id = task_id
+            await db.commit()
+
         chat_logs = db_session.chat_logs or []
 
     dialog_history = [
