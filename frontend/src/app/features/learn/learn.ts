@@ -7,7 +7,9 @@ import { MenuModule } from 'primeng/menu';
 import { MenuItem } from 'primeng/api';
 import { ChatService } from '../../core/services/chat.service';
 import { DocumentsService, TaskResponse, TaskStatus, QuizResponse, CheatsheetResponse, DocumentResponse, QuizAttemptResponse } from '../../core/services/documents.service';
+import { SoundService } from '../../core/services/sound.service';
 import { finalize } from 'rxjs/operators';
+import confetti from 'canvas-confetti';
 
 import { EditTagsDialog } from '../../shared/components/edit-tags-dialog/edit-tags-dialog';
 
@@ -31,6 +33,7 @@ export class Learn implements OnInit {
   private documentsService = inject(DocumentsService);
   private messageService = inject(MessageService);
   private confirmationService = inject(ConfirmationService);
+  private soundService = inject(SoundService);
 
   activeTab = signal<'quiz' | 'tasks' | 'cheatsheets'>('quiz');
 
@@ -107,7 +110,7 @@ export class Learn implements OnInit {
           icon: 'pi pi-comments',
           command: () => chat.loadSession(s)
         }));
-        
+
         if (items.length === 0) {
           this.chatMenuItems.set([{ label: 'No recent chats', disabled: true }]);
         } else {
@@ -142,7 +145,7 @@ export class Learn implements OnInit {
     if (this.isResizing()) {
       const deltaX = this.dragStartX - event.clientX;
       const newWidth = this.dragStartWidth + deltaX;
-      
+
       const maxAvailableWidth = containerWidth - gapSpace - minCenterWidth - (this.isLibraryExpanded() ? this.libraryPanelWidth() : 0);
       const actualMax = Math.min(800, Math.max(300, maxAvailableWidth));
 
@@ -156,10 +159,10 @@ export class Learn implements OnInit {
     } else if (this.isLibraryResizing()) {
       const deltaX = event.clientX - this.libDragStartX;
       const newWidth = this.libDragStartWidth + deltaX;
-      
+
       const maxAvailableWidth = containerWidth - gapSpace - minCenterWidth - (this.isChatExpanded() ? this.chatPanelWidth() : 0);
       const actualMax = Math.min(600, Math.max(250, maxAvailableWidth));
-      
+
       if (newWidth >= 250 && newWidth <= actualMax) {
         this.libraryPanelWidth.set(newWidth);
       } else if (newWidth > actualMax) {
@@ -294,6 +297,14 @@ export class Learn implements OnInit {
     this.generatedTasks.update(tasks => tasks.map(t => t.task_id === task.task_id ? { ...t, status: newStatus } : t));
 
     this.documentsService.updateTaskStatus(task.task_id, newStatus).subscribe({
+      next: (updatedTask) => {
+        // Only fire confetti if completing the task
+        if (newStatus === 'solved') {
+          this.fireConfetti('good');
+        }
+        // Update the task with backend state (which includes is_rewarded if applicable)
+        this.generatedTasks.update(tasks => tasks.map(t => t.task_id === task.task_id ? updatedTask : t));
+      },
       error: () => {
         // Revert on error
         this.generatedTasks.update(tasks => tasks.map(t => t.task_id === task.task_id ? { ...t, status: task.status } : t));
@@ -344,6 +355,15 @@ export class Learn implements OnInit {
               [quiz.quiz_id]: [attempt, ...existing]
             };
           });
+
+          let performance: 'perfect' | 'good' | 'bad' = 'bad';
+          if (attempt.score === attempt.total_questions) {
+            performance = 'perfect';
+          } else if (attempt.score >= attempt.total_questions / 2) {
+            performance = 'good';
+          }
+
+          this.fireConfetti(performance);
         },
         error: () => {
           this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to submit quiz' });
@@ -414,5 +434,45 @@ export class Learn implements OnInit {
   openEditTags(doc: DocumentResponse) {
     this.selectedDocToEdit.set(doc);
     this.isEditTagsDialogVisible.set(true);
+  }
+
+  private fireConfetti(performance: 'perfect' | 'good' | 'bad') {
+    if (performance === 'perfect') {
+      this.soundService.playJackpot();
+      const duration = 3000;
+      const end = Date.now() + duration;
+
+      const frame = () => {
+        confetti({
+          particleCount: 5,
+          angle: 60,
+          spread: 55,
+          origin: { x: 0 },
+          colors: ['#4f46e5', '#7c3aed', '#fbbf24']
+        });
+        confetti({
+          particleCount: 5,
+          angle: 120,
+          spread: 55,
+          origin: { x: 1 },
+          colors: ['#4f46e5', '#7c3aed', '#fbbf24']
+        });
+
+        if (Date.now() < end) {
+          requestAnimationFrame(frame);
+        }
+      };
+      frame();
+    } else if (performance === 'good') {
+      this.soundService.playWin();
+      confetti({
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ['#4f46e5', '#7c3aed', '#fbbf24']
+      });
+    } else {
+      this.soundService.playLoss();
+    }
   }
 }

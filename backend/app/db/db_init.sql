@@ -15,7 +15,31 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash VARCHAR(255) NOT NULL,
     coins INT DEFAULT 0 CHECK (coins >= 0),
     experience INT DEFAULT 0 CHECK (experience >= 0),
+    last_login_date DATE,
+    current_streak INT DEFAULT 0 CHECK (current_streak >= 0),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 1.5 Calendar Notes Table
+CREATE TABLE IF NOT EXISTS calendar_notes (
+    note_id VARCHAR(255) PRIMARY KEY,
+    user_id VARCHAR(255) NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    title VARCHAR(255) NOT NULL,
+    content TEXT NOT NULL,
+    start_time TIMESTAMP WITH TIME ZONE NOT NULL,
+    end_time TIMESTAMP WITH TIME ZONE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 1.6 Daily Logins History Table
+CREATE TABLE IF NOT EXISTS daily_logins (
+    login_id VARCHAR(255) PRIMARY KEY,
+    user_id VARCHAR(255) NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    login_date DATE NOT NULL,
+    reward_coins INT NOT NULL DEFAULT 0,
+    streak_count INT NOT NULL DEFAULT 1,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (user_id, login_date)
 );
 
 -- 2. Learning Profiles Table
@@ -56,6 +80,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     task_text TEXT NOT NULL,
     key_concepts JSONB DEFAULT '[]'::jsonb,
     status VARCHAR(50) NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'in_progress', 'solved', 'repeat'))
+    is_rewarded BOOLEAN DEFAULT FALSE NOT NULL
 );
 
 -- 8. Sessions Table

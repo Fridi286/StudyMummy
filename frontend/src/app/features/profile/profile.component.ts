@@ -18,6 +18,7 @@ import { ProgressBarModule } from 'primeng/progressbar';
 import { MessageService } from 'primeng/api';
 import { ImageCropperComponent, ImageCroppedEvent, LoadedImage } from 'ngx-image-cropper';
 
+import { LEVEL_TITLES } from '../../shared/constants/levels';
 @Component({
   selector: 'app-profile',
   standalone: true,
@@ -87,6 +88,14 @@ export class ProfileComponent implements OnInit {
   get expProgress(): number {
     const xp = this.profileData()?.experience || 0;
     return xp % 100;
+  }
+
+  get levelTitle(): string {
+    const lvl = this.profileData()?.level || 1;
+    if (lvl >= 1 && lvl <= 100) {
+      return LEVEL_TITLES[lvl];
+    }
+    return lvl > 100 ? "Level Cap Reached" : LEVEL_TITLES[0];
   }
 
   onAvatarSelect(event: any): void {

@@ -1,6 +1,7 @@
 import uuid
 import io
 import os
+import datetime
 from typing import Annotated, ClassVar
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -33,6 +34,8 @@ class UserResponse(BaseModel):
     experience: int
     level: int
     avatar_url: str | None = None
+    last_login_date: datetime.date | None = None
+    current_streak: int = 0
 
     model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)
 
