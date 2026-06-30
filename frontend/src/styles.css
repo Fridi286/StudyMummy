@@ -1,4 +1,20 @@
 @import 'tailwindcss';
+@plugin "@tailwindcss/typography";
+
+@keyframes slideUp {
+  0% { opacity: 0; transform: translate(-50%, 20px); }
+  100% { opacity: 1; transform: translate(-50%, 0); }
+}
+
+@keyframes slideInRight {
+  0% { opacity: 0; transform: translateX(50px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes shimmer {
+  100% { transform: translateX(100%); }
+}
+
 @import 'primeicons/primeicons.css';
 
 html,

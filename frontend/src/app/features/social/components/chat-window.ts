@@ -29,12 +29,23 @@ export class ChatWindowComponent {
   @Output() removeFriend = new EventEmitter<UserPublic>();
 
   _room: ChatroomResponse | null = null;
+  chatMenuItems: MenuItem[] = [];
+
   @Input() set room(value: ChatroomResponse | null) {
     this._room = value;
     if (value) {
       this.loadInitialMessages(value);
+      const currentUserId = this.authService.currentUser()?.user_id;
+      const other = value.members.find(m => m.user_id !== currentUserId);
+      if (other) {
+        this.chatMenuItems = [
+          { label: 'Propose Trade', icon: 'pi pi-arrow-right-arrow-left', command: () => this.openTrade.emit(other) },
+          { label: 'Remove Friend', icon: 'pi pi-user-minus', styleClass: 'text-red-500', command: () => this.removeFriend.emit(other) }
+        ];
+      }
     } else {
       this.chatMessages.set([]);
+      this.chatMenuItems = [];
     }
   }
   get room() { return this._room; }
@@ -112,12 +123,7 @@ export class ChatWindowComponent {
     return this.room.members.find(m => m.user_id !== currentUserId);
   }
 
-  getChatMenuItems(friend: UserPublic): MenuItem[] {
-    return [
-      { label: 'Propose Trade', icon: 'pi pi-arrow-right-arrow-left', command: () => this.openTrade.emit(friend) },
-      { label: 'Remove Friend', icon: 'pi pi-user-minus', styleClass: 'text-red-500', command: () => this.removeFriend.emit(friend) }
-    ];
-  }
+
 
   getPresence(userId: string): string {
     return this.chatService.userPresence()[userId] || 'offline';

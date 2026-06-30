@@ -128,7 +128,21 @@ export class SocialSidebarComponent implements OnInit {
   acceptTrade(trade: TradeResponse) {
     this.tradeService.acceptTrade(trade.trade_id).subscribe({
       next: () => {
-        this.messageService.add({ severity: 'success', summary: 'Trade Accepted' });
+        const received = [];
+        if (trade.sender_coins > 0) received.push(`${trade.sender_coins} coins`);
+        const rItems = this.getOfferedItems(trade).map((i: any) => `${i.quantity}x ${i.item.name}`);
+        if (rItems.length) received.push(...rItems);
+
+        const given = [];
+        if (trade.receiver_coins > 0) given.push(`${trade.receiver_coins} coins`);
+        const gItems = this.getRequestedItems(trade).map((i: any) => `${i.quantity}x ${i.item.name}`);
+        if (gItems.length) given.push(...gItems);
+
+        let detail = `Trade with ${trade.sender.username} complete!`;
+        if (received.length) detail += `\nReceived: ${received.join(', ')}.`;
+        if (given.length) detail += `\nGave: ${given.join(', ')}.`;
+
+        this.messageService.add({ severity: 'success', summary: 'Trade Accepted', detail: detail, life: 5000 });
         this.loadPendingTrades();
       },
       error: (err) => {
