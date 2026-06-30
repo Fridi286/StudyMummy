@@ -3,6 +3,7 @@ Tool-Registry: alle verfügbaren Agent-Tools werden hier zentral registriert.
 Neue Tools können einfach hinzugefügt werden, ohne die Agent-Logik zu ändern.
 """
 from dataclasses import dataclass
+from collections.abc import Iterable
 from typing import Callable, cast
 from collections.abc import Coroutine
 from typing_extensions import TypedDict
@@ -50,10 +51,13 @@ def get(name: str) -> ToolDefinition:
     return _REGISTRY[name]
 
 
-def as_openai_tools() -> list[ChatCompletionToolParam]:
+def as_openai_tools(allowed_names: Iterable[str] | None = None) -> list[ChatCompletionToolParam]:
     """Gibt alle Tools im OpenAI Function-Calling-Format zurück."""
     tools: list[ChatCompletionToolParam] = []
+    allowed = set(allowed_names) if allowed_names is not None else None
     for t in get_all():
+        if allowed is not None and t.name not in allowed:
+            continue
         tool_param: ChatCompletionToolParam = {
             "type": "function",
             "function": {

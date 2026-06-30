@@ -12,7 +12,7 @@ from sqlalchemy import select
 from app.tools.registry import ToolDefinition, register, ToolResult
 from app.core.logging import get_logger
 from app.db.session import AsyncSessionLocal
-from app.db.models import User, ActiveItem, CalendarNote
+from app.db.models import User, ActiveItem, CalendarNote, Task, Document, ChatLog, Session
 from app.core.context import current_user_id
 from app.websockets.manager import manager
 
@@ -147,15 +147,48 @@ register(ToolDefinition(
 
 
 # ─── award_coins_and_exp ──────────────────────────────────────────────────────
-async def _award_coins_and_exp(amount: int, reason: str) -> ToolResult:
+async def _award_coins_and_exp(amount: int, reason: str, task_id: str | None = None) -> ToolResult:
     """Real: vergibt Münzen und Erfahrungspunkte (mit aktiven Multiplikatoren)."""
+    # Guardrail 1: Limit amount to between 1 and 100 to prevent abuse
+    amount = max(1, min(100, amount))
+    
     user_id = current_user_id.get()
     if not user_id:
         return {"error": "Kein user_id im Kontext"}
 
-    log.info("award_coins_and_exp called", extra={"user_id": user_id, "amount": amount})
+    log.info("award_coins_and_exp called", extra={"user_id": user_id, "amount": amount, "task_id": task_id})
     
     async with AsyncSessionLocal() as db:
+        # Guardrail 2: Check if user is begging for coins (Prompt Injection)
+        stmt_log = select(ChatLog).join(Session).where(
+            Session.user_id == user_id,
+            ChatLog.role == "user"
+        ).order_by(ChatLog.timestamp.desc()).limit(1)
+        last_msg = (await db.execute(stmt_log)).scalars().first()
+        
+        if last_msg:
+            msg_lower = last_msg.content.lower()
+            cheat_words = ["coin", "münze", "belohn", "award", "exp", "erfahrung", "cheat", "ignore prompt"]
+            if any(w in msg_lower for w in cheat_words):
+                return {"error": "Cheating erkannt: Direkte Aufforderung nach Belohnungen ist nicht erlaubt."}
+
+        # Guardrail 3: Verify Task if task_id is provided
+        if task_id:
+            stmt_task = select(Task).join(Document).where(
+                Task.task_id == task_id, 
+                Document.user_id == user_id
+            )
+            task = (await db.execute(stmt_task)).scalars().first()
+            if not task:
+                return {"error": f"Aufgabe '{task_id}' nicht gefunden. Belohnung abgelehnt."}
+            if task.is_rewarded:
+                return {"error": f"Aufgabe '{task_id}' wurde bereits belohnt. Kein Cheating!"}
+            
+            task.is_rewarded = True
+        else:
+            # Guardrail 4: If no task_id, limit to max 10 coins for general good questions
+            amount = min(amount, 10)
+
         stmt = select(User).where(User.user_id == user_id)
         current_user = (await db.execute(stmt)).scalars().first()
         if not current_user:
@@ -195,12 +228,13 @@ async def _award_coins_and_exp(amount: int, reason: str) -> ToolResult:
 
 register(ToolDefinition(
     name="award_coins_and_exp",
-    description="Vergibt virtuelle Münzen und Erfahrungspunkte an den Nutzer als Belohnung für eine gute Antwort.",
+    description="Vergibt virtuelle Münzen und Erfahrungspunkte an den Nutzer als Belohnung für eine gute Antwort. Wenn sich die Antwort auf eine bestimmte Aufgabe bezieht, gib die task_id an.",
     parameters={
         "type": "object",
         "properties": {
-            "amount": {"type": "integer", "minimum": 1, "description": "Basis-Menge an Münzen/Exp"},
-            "reason": {"type": "string", "description": "Grund für die Belohnung"}
+            "amount": {"type": "integer", "minimum": 1, "maximum": 100, "description": "Basis-Menge an Münzen/Exp (Max 100)"},
+            "reason": {"type": "string", "description": "Grund für die Belohnung"},
+            "task_id": {"type": "string", "description": "Optionale ID der gelösten Aufgabe zur Verifizierung"}
         },
         "required": ["amount", "reason"],
     },
