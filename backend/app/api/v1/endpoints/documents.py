@@ -7,7 +7,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, status, BackgroundTasks
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 
 from app.db.session import get_async_db
@@ -18,6 +18,7 @@ from app.models.document import (
     TaskStatusUpdate, QuizAttemptRequest, QuizAttemptResponse, DocumentTagsUpdate
 )
 from app.services.document_analyzer import analyze_document_background_task
+from app.websockets.manager import manager
 
 router = APIRouter()
 
@@ -220,7 +221,44 @@ async def update_task_status(
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
         
-    task.status = update.status.value
+    # Optional: Verify task belongs to current user's document
+    # stmt = select(Document).where(Document.document_id == task.document_id)
+    # doc = (await db.execute(stmt)).scalars().first()
+    # if doc.user_id != current_user.user_id: raise HTTPException(status_code=403, detail="Forbidden")
+
+    if update.status == "solved" and not task.is_rewarded:
+        reward = task.difficulty * 10
+        
+        # Calculate xp multiplier from active items
+        from app.db.models import ActiveItem
+        now_utc = datetime.now(timezone.utc)
+        stmt_boosts = select(ActiveItem).where(
+            ActiveItem.user_id == current_user.user_id,
+            (ActiveItem.expires_at == None) | (ActiveItem.expires_at > now_utc)
+        )
+        active_boosts = (await db.execute(stmt_boosts)).scalars().all()
+        
+        xp_multiplier = 1.0
+        for boost in active_boosts:
+            if "xp_multiplier" in boost.effects:
+                xp_multiplier *= float(boost.effects["xp_multiplier"])
+                
+        final_exp_reward = int(reward * xp_multiplier)
+        
+        current_user.coins += reward
+        current_user.experience += final_exp_reward
+        task.is_rewarded = True
+        db.add(current_user)
+        
+        await manager.send_personal_message(current_user.user_id, {
+            "type": "REWARD_GAINED",
+            "coins": reward,
+            "experience": final_exp_reward,
+            "total_experience": current_user.experience,
+            "reason": "Task Completed"
+        })
+
+    task.status = update.status
     await db.commit()
     await db.refresh(task)
     return task
@@ -263,6 +301,43 @@ async def submit_quiz_attempt(
         if q_id in correct_answers_map and correct_answers_map[q_id] == selected_opt:
             score += 1
             
+    # Check if first try
+    stmt_attempts = select(func.count()).select_from(QuizAttempt).where(QuizAttempt.quiz_id == quiz_id)
+    result_attempts = await db.execute(stmt_attempts)
+    previous_attempts_count = result_attempts.scalar_one()
+
+    if previous_attempts_count == 0:
+        # First try, reward based on performance (e.g., 20 coins/xp per correct answer)
+        reward = score * 20
+        
+        # Calculate xp multiplier from active items
+        from app.db.models import ActiveItem
+        now_utc = datetime.now(timezone.utc)
+        stmt_boosts = select(ActiveItem).where(
+            ActiveItem.user_id == current_user.user_id,
+            (ActiveItem.expires_at == None) | (ActiveItem.expires_at > now_utc)
+        )
+        active_boosts = (await db.execute(stmt_boosts)).scalars().all()
+        
+        xp_multiplier = 1.0
+        for boost in active_boosts:
+            if "xp_multiplier" in boost.effects:
+                xp_multiplier *= float(boost.effects["xp_multiplier"])
+                
+        final_exp_reward = int(reward * xp_multiplier)
+        
+        current_user.coins += reward
+        current_user.experience += final_exp_reward
+        db.add(current_user)
+
+        await manager.send_personal_message(current_user.user_id, {
+            "type": "REWARD_GAINED",
+            "coins": reward,
+            "experience": final_exp_reward,
+            "total_experience": current_user.experience,
+            "reason": "Quiz Completed"
+        })
+
     # 3. Save attempt
     attempt = QuizAttempt(
         attempt_id=str(uuid.uuid4()),

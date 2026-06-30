@@ -13,6 +13,8 @@ export interface UserResponse {
   experience: number;
   level: number;
   avatar_url?: string;
+  last_login_date?: string;
+  current_streak: number;
   iat?: number;
 }
 

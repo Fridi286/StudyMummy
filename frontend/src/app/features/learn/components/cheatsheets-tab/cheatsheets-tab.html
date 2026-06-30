@@ -15,7 +15,19 @@
       <div class="bg-white border border-amber-100 rounded-xl p-6 shadow-sm relative overflow-hidden">
         <div class="absolute top-0 left-0 w-1.5 h-full bg-amber-400"></div>
         
-        <h3 class="text-xl font-extrabold text-slate-800 mb-5 pl-4">{{ sheet.title }}</h3>
+        <div class="flex justify-between items-start mb-5 pl-4 gap-4">
+          <h3 class="text-xl font-extrabold text-slate-800 flex-1">{{ sheet.title }}</h3>
+          <div class="flex gap-2 flex-shrink-0">
+            <button class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-indigo-100 hover:text-indigo-600 flex items-center justify-center transition-colors shadow-sm" 
+                    (click)="copyMarkdown(sheet)" title="Copy Markdown">
+              <i class="pi pi-copy text-sm"></i>
+            </button>
+            <button class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-amber-100 hover:text-amber-600 flex items-center justify-center transition-colors shadow-sm" 
+                    (click)="downloadMarkdown(sheet)" title="Download Markdown (.md)">
+              <i class="pi pi-download text-sm"></i>
+            </button>
+          </div>
+        </div>
         
         <div class="mb-5 pl-4">
           <h4 class="font-bold text-amber-900 mb-2.5 uppercase tracking-wider text-[10px]">Key Concepts</h4>
@@ -28,8 +40,9 @@
           </div>
         </div>
         
-        <div class="prose prose-amber max-w-none text-slate-700 bg-slate-50/80 p-5 rounded-lg border border-slate-100 whitespace-pre-wrap pl-4 font-mono text-[13px] leading-relaxed">
-          {{ sheet.content }}
+        <div class="prose prose-amber prose-sm max-w-none text-slate-700 bg-slate-50/80 p-5 rounded-lg border border-slate-100 pl-4 leading-relaxed marker:text-amber-500 prose-headings:text-amber-900 prose-a:text-amber-600 prose-code:text-amber-800 prose-code:bg-amber-100/50 prose-code:px-1 prose-code:rounded"
+             (click)="onMarkdownClick($event)"
+             [innerHTML]="sheet.content | markdown">
         </div>
       </div>
     }

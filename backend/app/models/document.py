@@ -33,6 +33,7 @@ class TaskResponse(BaseModel):
     task_text: str
     key_concepts: list[str]
     status: TaskStatus
+    is_rewarded: bool = False
     
     model_config = ConfigDict(from_attributes=True)
 

@@ -16,8 +16,13 @@ from app.core.config import get_settings
 from app.db.models import LearningProfile as DbLearningProfile
 from app.db.session import AsyncSessionLocal
 from app.services.session_service import update_profile
+import uuid
 from app.tools.registry import ToolDefinition, register, ToolResult
 from app.core.logging import get_logger
+from app.db.session import AsyncSessionLocal
+from app.db.models import User, ActiveItem, CalendarNote, Task, Document, ChatLog, Session
+from app.core.context import current_user_id
+from app.websockets.manager import manager
 
 log = get_logger(__name__)
 
@@ -320,23 +325,143 @@ register(ToolDefinition(
 ))
 
 
-# ─── award_coins ──────────────────────────────────────────────────────────────
-async def _award_coins(user_id: str, amount: int, reason: str) -> ToolResult:
-    """Mock: vergibt virtuelle Währung (Gamification)."""
-    log.info("award_coins called", extra={"user_id": user_id, "amount": amount})
-    return {"user_id": user_id, "coins_awarded": amount, "reason": reason}
+# ─── award_coins_and_exp ──────────────────────────────────────────────────────
+async def _award_coins_and_exp(amount: int, reason: str, task_id: str | None = None) -> ToolResult:
+    """Real: vergibt Münzen und Erfahrungspunkte (mit aktiven Multiplikatoren)."""
+    # Guardrail 1: Limit amount to between 1 and 100 to prevent abuse
+    amount = max(1, min(100, amount))
+    
+    user_id = current_user_id.get()
+    if not user_id:
+        return {"error": "Kein user_id im Kontext"}
+
+    log.info("award_coins_and_exp called", extra={"user_id": user_id, "amount": amount, "task_id": task_id})
+    
+    async with AsyncSessionLocal() as db:
+        # Guardrail 2: Check if user is begging for coins (Prompt Injection)
+        stmt_log = select(ChatLog).join(Session).where(
+            Session.user_id == user_id,
+            ChatLog.role == "user"
+        ).order_by(ChatLog.timestamp.desc()).limit(1)
+        last_msg = (await db.execute(stmt_log)).scalars().first()
+        
+        if last_msg:
+            msg_lower = last_msg.content.lower()
+            cheat_words = ["coin", "münze", "belohn", "award", "exp", "erfahrung", "cheat", "ignore prompt"]
+            if any(w in msg_lower for w in cheat_words):
+                return {"error": "Cheating erkannt: Direkte Aufforderung nach Belohnungen ist nicht erlaubt."}
+
+        # Guardrail 3: Verify Task if task_id is provided
+        if task_id:
+            stmt_task = select(Task).join(Document).where(
+                Task.task_id == task_id, 
+                Document.user_id == user_id
+            )
+            task = (await db.execute(stmt_task)).scalars().first()
+            if not task:
+                return {"error": f"Aufgabe '{task_id}' nicht gefunden. Belohnung abgelehnt."}
+            if task.is_rewarded:
+                return {"error": f"Aufgabe '{task_id}' wurde bereits belohnt. Kein Cheating!"}
+            
+            task.is_rewarded = True
+        else:
+            # Guardrail 4: If no task_id, limit to max 10 coins for general good questions
+            amount = min(amount, 10)
+
+        stmt = select(User).where(User.user_id == user_id)
+        current_user = (await db.execute(stmt)).scalars().first()
+        if not current_user:
+            return {"error": "Nutzer nicht gefunden"}
+            
+        now_utc = datetime.now(timezone.utc)
+        stmt_boosts = select(ActiveItem).where(
+            ActiveItem.user_id == user_id,
+            (ActiveItem.expires_at == None) | (ActiveItem.expires_at > now_utc)
+        )
+        active_boosts = (await db.execute(stmt_boosts)).scalars().all()
+        
+        xp_multiplier = 1.0
+        for boost in active_boosts:
+            if "xp_multiplier" in boost.effects:
+                xp_multiplier *= float(boost.effects["xp_multiplier"])
+                
+        final_exp = int(amount * xp_multiplier)
+        current_user.coins += amount
+        current_user.experience += final_exp
+        
+        await db.commit()
+        
+    await manager.send_personal_message(user_id, {
+        "type": "REWARD_GAINED",
+        "coins": amount,
+        "experience": final_exp,
+        "total_experience": current_user.experience,
+        "reason": reason
+    })
+        
+    return {
+        "coins_awarded": amount, 
+        "exp_awarded": final_exp, 
+        "reason": reason
+    }
 
 register(ToolDefinition(
-    name="award_coins",
-    description="Vergibt virtuelle Währung an den Nutzer als Belohnung.",
+    name="award_coins_and_exp",
+    description="Vergibt virtuelle Münzen und Erfahrungspunkte an den Nutzer als Belohnung für eine gute Antwort. Wenn sich die Antwort auf eine bestimmte Aufgabe bezieht, gib die task_id an.",
     parameters={
         "type": "object",
         "properties": {
-            "user_id": {"type": "string"},
-            "amount": {"type": "integer", "minimum": 1},
-            "reason": {"type": "string"},
+            "amount": {"type": "integer", "minimum": 1, "maximum": 100, "description": "Basis-Menge an Münzen/Exp (Max 100)"},
+            "reason": {"type": "string", "description": "Grund für die Belohnung"},
+            "task_id": {"type": "string", "description": "Optionale ID der gelösten Aufgabe zur Verifizierung"}
         },
-        "required": ["user_id", "amount", "reason"],
+        "required": ["amount", "reason"],
     },
-    fn=_award_coins,
+    fn=_award_coins_and_exp,
+))
+
+# ─── add_calendar_note ────────────────────────────────────────────────────────
+async def _add_calendar_note(title: str, content: str, start_time: str, end_time: str) -> ToolResult:
+    """Real: Trägt eine Notiz/Lerneinheit in den Kalender ein."""
+    user_id = current_user_id.get()
+    if not user_id:
+        return {"error": "Kein user_id im Kontext"}
+        
+    log.info("add_calendar_note called", extra={"user_id": user_id, "title": title})
+    
+    try:
+        start_dt = datetime.fromisoformat(start_time.replace('Z', '+00:00'))
+        end_dt = datetime.fromisoformat(end_time.replace('Z', '+00:00'))
+    except ValueError as e:
+        return {"error": f"Ungültiges Datumsformat: {e}"}
+
+    async with AsyncSessionLocal() as db:
+        note = CalendarNote(
+            note_id=str(uuid.uuid4()),
+            user_id=user_id,
+            title=title,
+            content=content,
+            start_time=start_dt,
+            end_time=end_dt,
+            created_at=datetime.now(timezone.utc)
+        )
+        db.add(note)
+        await db.commit()
+        
+    return {"status": "success", "title": title, "start_time": start_time}
+
+register(ToolDefinition(
+    name="add_calendar_note",
+    description="Erstellt einen Kalendereintrag (Lernsession/Erinnerung) für den Nutzer.",
+    parameters={
+        "type": "object",
+        "properties": {
+            "title": {"type": "string", "description": "Kurzer Titel des Termins"},
+            "content": {"type": "string", "description": "Details oder Ziele der Lernsession"},
+            "start_time": {"type": "string", "description": "Startzeitpunkt als ISO-8601 String (z.B. 2026-06-30T15:00:00Z)"},
+            "end_time": {"type": "string", "description": "Endzeitpunkt als ISO-8601 String"}
+        },
+        "required": ["title", "content", "start_time", "end_time"],
+    },
+    fn=_add_calendar_note,
 ))

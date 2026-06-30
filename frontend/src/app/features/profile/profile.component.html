@@ -14,11 +14,22 @@
   </div>
   } @else if (profileData()) {
   <div class="w-full max-w-4xl mx-auto">
-    <p-card styleClass="shadow-2xl border border-slate-200/60 rounded-3xl p-4 sm:p-6 bg-white/80 backdrop-blur-md">
+    <p-card styleClass="relative shadow-2xl border border-slate-200/60 rounded-3xl p-4 sm:p-6 bg-white/80 backdrop-blur-md">
+      <!-- Edit Profile Button (Top Right) -->
+      @if (!isEditing()) {
+      <div class="absolute top-6 right-6 z-10 hidden sm:block">
+        <p-button label="Edit Profile" icon="pi pi-pencil" severity="secondary" [text]="true" size="small"
+          (onClick)="toggleEdit()" styleClass="font-bold text-slate-500 hover:text-indigo-600 hover:bg-slate-100/50 rounded-xl transition-colors"></p-button>
+      </div>
+      <div class="absolute top-6 right-6 z-10 sm:hidden">
+        <p-button icon="pi pi-pencil" severity="secondary" [rounded]="true" [text]="true"
+          (onClick)="toggleEdit()" styleClass="w-10 h-10 text-slate-500 hover:text-indigo-600 hover:bg-slate-100/50 transition-colors"></p-button>
+      </div>
+      }
 
-      <div class="flex flex-col md:flex-row items-center gap-6 border-b border-slate-200 pb-10 mb-10">
+      <div class="flex flex-col md:flex-row items-center md:items-stretch gap-6 border-b border-slate-200 pb-10 mb-10">
         <!-- Avatar -->
-        <div class="relative group flex-shrink-0">
+        <div class="relative group flex-shrink-0 md:self-center">
           @if (avatarPreviewUrl() || fullAvatarUrl) {
           <img [src]="avatarPreviewUrl() || fullAvatarUrl"
             class="rounded-full object-cover shadow-xl border-4 border-white bg-white"
@@ -53,7 +64,7 @@
           <!-- Experience Bar -->
           <div class="w-full max-w-lg mt-auto">
             <div class="flex justify-between items-end mb-1.5">
-              <span class="text-sm font-extrabold text-slate-800">Level {{ profileData()?.level }}</span>
+              <span class="text-sm font-extrabold text-slate-800">Level {{ profileData()?.level }} ({{ levelTitle }})</span>
               <span class="text-xs font-bold text-indigo-500">{{ expProgress }} / 100 XP</span>
             </div>
             <p-progressBar [value]="expProgress" [showValue]="false" styleClass="w-full h-2.5 rounded-full bg-slate-100 shadow-inner" color="#6366f1"></p-progressBar>
@@ -62,19 +73,26 @@
         </div>
 
         <!-- Quick Stats & Actions -->
-        <div class="flex flex-col items-center gap-4">
-          <div
-            class="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-col items-center shadow-sm min-w-32">
-            <span class="text-amber-600 font-bold text-xs uppercase tracking-wider mb-1">Study Coins</span>
-            <div class="flex items-center gap-2">
-              <i class="pi pi-star-fill text-amber-500 text-2xl"></i>
-              <span class="text-3xl font-black text-amber-700">{{ profileData()?.coins }}</span>
+        <div class="flex flex-col items-center mt-auto">
+          <div class="w-full flex gap-3">
+            <div
+              class="bg-amber-50 border border-amber-200 rounded-xl p-3 flex flex-col items-center shadow-sm flex-1 min-w-0">
+              <span class="text-amber-600 font-bold text-[9px] uppercase tracking-wide mb-1 whitespace-nowrap truncate w-full text-center">Study Coins</span>
+              <div class="flex items-center gap-1.5">
+                <i class="pi pi-star-fill text-amber-500 text-lg"></i>
+                <span class="text-xl font-black text-amber-700">{{ profileData()?.coins }}</span>
+              </div>
+            </div>
+            
+            <div
+              class="bg-orange-50 border border-orange-200 rounded-xl p-3 flex flex-col items-center shadow-sm flex-1 min-w-0">
+              <span class="text-orange-600 font-bold text-[9px] uppercase tracking-wide mb-1 whitespace-nowrap truncate w-full text-center">Daily Streak</span>
+              <div class="flex items-center gap-1.5">
+                <span class="text-lg">🔥</span>
+                <span class="text-xl font-black text-orange-700">{{ profileData()?.current_streak }}</span>
+              </div>
             </div>
           </div>
-          @if (!isEditing()) {
-          <p-button label="Edit Profile" icon="pi pi-pencil" severity="secondary" variant="outlined"
-            (onClick)="toggleEdit()" styleClass="w-full rounded-xl font-bold"></p-button>
-          }
         </div>
       </div>
 

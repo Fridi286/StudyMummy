@@ -17,6 +17,10 @@ class WebSocketMessage(TypedDict, total=False):
     username: str
     message: str | ChatMessagePayload
     session_id: str
+    coins: int
+    experience: int
+    total_experience: int
+    reason: str
 
 from app.core.logging import get_logger
 

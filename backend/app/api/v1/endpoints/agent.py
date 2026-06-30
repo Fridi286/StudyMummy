@@ -9,8 +9,10 @@ from app.models.agent import (
     QuizRequest, QuizResponse,
     CheatsheetRequest, CheatsheetResponse,
 )
-from app.services.llm_service import LLMService, build_tutor_system_prompt
+from app.services.llm_service import LLMService, build_tutor_system_prompt, filter_user_input
+from app.services.llm_service import LLMService, filter_user_input
 from app.services.rag_service import RAGService, get_rag_service
+from app.core.context import current_user_id
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_async_db
 from app.api.dependencies import get_current_user
@@ -27,6 +29,7 @@ log = get_logger(__name__)
 router = APIRouter(prefix="/agent", tags=["Agent"])
 
 _llm = LLMService()
+CHAT_ALLOWED_TOOL_NAMES = ("evaluate_answer", "award_coins_and_exp", "add_calendar_note")
 
 
 def _infer_help_level(message: str, current_level: int) -> int:
@@ -119,10 +122,17 @@ async def chat(
 ):
     """
     Hauptendpunkt: Nutzer schreibt eine Nachricht, der Agent antwortet sokratisch
-    und nutzt bei Bedarf Tools (evaluate_answer, update_learning_profile, award_coins).
+    und nutzt bei Bedarf nur das eng erlaubte Tool-Subset für diesen Chat.
     """
+    try:
+        message = filter_user_input(req.message)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    # Set context variable for tools
+    current_user_id.set(current_user.user_id)
+
     # Working Memory auffrischen
-    session = await get_or_create_session(db, req.session_id, current_user.user_id)
+    session = await get_or_create_session(db, req.session_id, current_user.user_id, req.task_id)
     help_level = _infer_help_level(req.message, session.help_level)
     active_task_id = req.task_id or session.current_task_id
     session = await update_session_context(
@@ -134,10 +144,20 @@ async def chat(
     )
 
     # Nachricht ins Gedächtnis
-    await append_dialog(db, req.session_id, "user", req.message)
+    await append_dialog(db, req.session_id, "user", message)
 
     # RAG-Kontext holen (pgvector)
-    context = await rag.retrieve(db, current_user.user_id, req.message)
+    rag_context = await rag.retrieve(db, current_user.user_id, req.message)
+
+    from datetime import datetime
+    current_time_str = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+    context = f"HEUTIGES DATUM UND UHRZEIT: {current_time_str}\n\n"
+    
+    if session.current_task_id:
+        context += f"AKTUELLE AUFGABE (task_id): {session.current_task_id}\n(WICHTIG: Wenn du Tools aufrufst, die eine task_id erwarten, nutze diese ID!)\n\n"
+        
+    if rag_context:
+        context += rag_context
 
     # Dialog-History für LLM
     messages = await get_dialog_as_messages(db, req.session_id, current_user.user_id)
@@ -151,6 +171,7 @@ async def chat(
             task_id=session.current_task_id,
         ),
         extra_context=context or None,
+        allowed_tool_names=CHAT_ALLOWED_TOOL_NAMES,
     )
 
     await append_dialog(db, req.session_id, "assistant", reply)

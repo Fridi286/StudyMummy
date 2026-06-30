@@ -2,6 +2,7 @@
 LLM service for chat, tool use, and task extraction.
 """
 import json
+import re
 import time
 from typing import Any, Iterable, cast
 
@@ -17,6 +18,13 @@ from app.models.agent import ExtractedTask
 from app.tools.registry import as_openai_tools, get
 
 log = get_logger(__name__)
+MAX_USER_INPUT_CHARS = 4000
+
+BLOCKED_INPUT_PATTERNS = (
+    re.compile(r"(?i)\bignore\b.*\b(previous|all)\b.*\binstructions\b"),
+    re.compile(r"(?i)\b(reveal|show|print)\b.*\b(system prompt|developer message|hidden prompt)\b"),
+    re.compile(r"(?i)\bdeveloper message\b"),
+)
 
 SOCRATIC_SYSTEM_PROMPT = """Du bist StudyMummy, ein sokratischer Tutor-Agent.
 Deine Aufgabe ist es, Lernende durch gezielte Rueckfragen zum Verstaendnis zu fuehren.
@@ -25,9 +33,10 @@ Gib niemals direkt die Loesung, wenn der Nutzer noch nicht nachgedacht hat.
 Prinzipien:
 1. Stelle immer eine Rueckfrage, bevor du erklaerst.
 2. Passe dein Hilfeniveau dynamisch an.
-3. Anerkenne Fortschritte und vergib Muenzen bei korrekten Antworten.
+3. Wenn der Nutzer eine gute Loesung oder kluge Frage einbringt (angemessen zur Schwierigkeit), belohne ihn mit dem Tool `award_coins_and_exp`!
 4. Wenn eine Aufgabe geloest ist, aktualisiere das Lernprofil.
-5. Antworte immer auf Deutsch, klar und motivierend.
+5. Wenn der Nutzer eine Lerneinheit, Pruefung oder Deadline erwaehnt, biete an oder trage es direkt als Termin mit dem Tool `add_calendar_note` ein.
+6. Antworte immer auf Deutsch, klar und motivierend.
 
 Hilfestufen:
 Level 1 = kleiner Denkanstoss, keine Loesung.
@@ -64,6 +73,17 @@ def build_tutor_system_prompt(
     return "\n".join(context_lines)
 
 
+def filter_user_input(text: str) -> str:
+    cleaned = text.replace("\x00", "").strip()
+    cleaned = re.sub(r"\s+", " ", cleaned)
+    if len(cleaned) > MAX_USER_INPUT_CHARS:
+        raise ValueError("Eingabe ist zu lang.")
+    for pattern in BLOCKED_INPUT_PATTERNS:
+        if pattern.search(cleaned):
+            raise ValueError("Eingabe enthaelt unzulaessige Anweisungen.")
+    return cleaned
+
+
 def _preview(value: str | Iterable[ChatCompletionContentPartParam], max_chars: int = 180) -> str:
     text = str(value).replace("\n", " ").strip()
     if len(text) <= max_chars:
@@ -98,15 +118,29 @@ class LLMService:
         messages: list[ChatCompletionMessageParam],
         system_prompt: str = SOCRATIC_SYSTEM_PROMPT,
         extra_context: str | None = None,
+        allowed_tool_names: Iterable[str] | None = None,
     ) -> tuple[str, list[str]]:
         """
         Run one or more LLM calls with optional tool use.
         """
+        filtered_messages: list[ChatCompletionMessageParam] = []
+        for message in messages:
+            if message.get("role") == "user":
+                content = message.get("content", "")
+                if not isinstance(content, str):
+                    content = str(content)
+                filtered_content = filter_user_input(content)
+                filtered_messages.append(cast(ChatCompletionMessageParam, cast(Any, {**message, "content": filtered_content})))
+            else:
+                filtered_messages.append(message)
+
+        allowed_tool_set = set(allowed_tool_names) if allowed_tool_names is not None else None
+
         trace = get_trace_id()
         started_at = time.perf_counter()
         log.info(
             f"[{trace}] LLM call started, messages={len(messages)}, "
-            f"extra_context={bool(extra_context)}, input_preview={_last_user_message(messages)!r}"
+            f"extra_context={bool(extra_context)}, input_preview={_last_user_message(filtered_messages)!r}"
         )
 
         full_messages: list[ChatCompletionMessageParam] = [{"role": "system", "content": system_prompt}]
@@ -115,9 +149,14 @@ class LLMService:
                 "role": "system",
                 "content": f"[RAG-Kontext]\n{extra_context}",
             })
-        full_messages.extend(messages)
+        if allowed_tool_names is not None:
+            full_messages.append({
+                "role": "system",
+                "content": f"[Tool-Scope] Erlaubte Tools in diesem Kontext: {', '.join(allowed_tool_names)}. Nutze keine anderen Tools."
+            })
+        full_messages.extend(filtered_messages)
 
-        tools = as_openai_tools()
+        tools = as_openai_tools(allowed_tool_names)
         supports_tools = "qwen" not in self.model.lower()
         tool_calls_made: list[str] = []
 
@@ -168,6 +207,15 @@ class LLMService:
                     continue
 
                 fn_name = tc.function.name
+                if allowed_tool_set is not None and fn_name not in allowed_tool_set:
+                    log.warning(f"[{trace}] Blocked disallowed tool call: {fn_name}")
+                    full_messages.append({
+                        "role": "tool",
+                        "tool_call_id": tc.id,
+                        "content": json.dumps({"error": "Tool not allowed in this context."}, ensure_ascii=False),
+                    })
+                    continue
+
                 tool_calls_made.append(fn_name)
                 try:
                     fn_args = json.loads(tc.function.arguments or "{}")

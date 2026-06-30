@@ -20,21 +20,24 @@ export class ChatService {
   private ws: WebSocket | null = null;
 
   public connected = signal<boolean>(false);
-  
+
   // Presence mapping: user_id -> 'online' | 'away' | 'offline'
   public userPresence = signal<Record<string, string>>({});
-  
+
   // A signal to hold the latest incoming message
   public latestMessage = signal<ChatMessageResponse | null>(null);
-  
+
   // A signal to hold the latest notification (e.g. FRIEND_REQUEST)
   public latestNotification = signal<any | null>(null);
-  
+
   // A signal to trigger trade refreshes
   public latestTradeUpdate = signal<number>(0);
-  
+
   // A signal to notify when a document finishes analyzing
   public latestDocumentAnalyzed = signal<string | null>(null);
+
+  // A signal to hold the latest reward gained event
+  public latestReward = signal<any | null>(null);
 
   // A signal to notify when background document analysis fails
   public latestDocumentAnalysisFailed = signal<{ documentId: string | null; message: string } | null>(null);
@@ -53,7 +56,7 @@ export class ChatService {
 
   private connect() {
     if (this.ws) return;
-    
+
     const token = localStorage.getItem('access_token');
     if (!token) return;
 
@@ -61,9 +64,9 @@ export class ChatService {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     // Assume backend is on port 8000 for local dev if frontend is 4200, otherwise relative
     const host = window.location.port === '4200' ? 'localhost:8000' : window.location.host;
-    
+
     const wsUrl = `${protocol}//${host}/api/v1/chat?token=${token}`;
-    
+
     this.ws = new WebSocket(wsUrl);
 
     this.ws.onopen = () => {
@@ -84,8 +87,10 @@ export class ChatService {
         } else if (data.type === 'DOCUMENT_ANALYSIS_FAILED') {
           this.latestDocumentAnalysisFailed.set({
             documentId: data.document_id ?? null,
-            message: data.message || 'Document analysis failed.'
+            message: data.message
           });
+        } else if (data.type === 'REWARD_GAINED') {
+          this.latestReward.set(data);
         } else if (data.type === 'PRESENCE_STATE') {
           this.userPresence.set(data.message || {});
         } else if (data.type === 'PRESENCE_UPDATE') {

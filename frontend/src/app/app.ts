@@ -6,11 +6,12 @@ import { ToastModule } from 'primeng/toast';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { ChatService } from './core/services/chat.service';
 import { MessageService } from 'primeng/api';
+import { RewardPopupComponent } from './shared/components/reward-popup/reward-popup';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, HeaderComponent, ToastModule, ConfirmDialogModule],
+  imports: [RouterOutlet, HeaderComponent, ToastModule, ConfirmDialogModule, RewardPopupComponent],
   templateUrl: './app.html',
   styleUrl: './app.css',
 })

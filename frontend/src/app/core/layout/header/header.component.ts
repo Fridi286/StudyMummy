@@ -115,6 +115,11 @@ export class HeaderComponent implements OnInit, OnDestroy {
             routerLink: '/documents'
           },
           {
+            label: 'Calendar',
+            icon: 'pi pi-calendar',
+            routerLink: '/calendar'
+          },
+          {
             label: 'Inventory',
             icon: 'pi pi-box',
             routerLink: '/inventory'

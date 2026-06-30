@@ -22,7 +22,7 @@
         </div>
         <div *ngIf="getOtherMember() as other">
           <p-button icon="pi pi-ellipsis-v" [rounded]="true" [text]="true" severity="secondary" (onClick)="chatMenu.toggle($event)"></p-button>
-          <p-menu #chatMenu [popup]="true" [model]="getChatMenuItems(other)"></p-menu>
+          <p-menu #chatMenu [popup]="true" [model]="chatMenuItems" appendTo="body"></p-menu>
         </div>
       </div>
 

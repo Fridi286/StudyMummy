@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
 from typing import Any
 
 from sqlalchemy import (
@@ -9,7 +9,8 @@ from sqlalchemy import (
     ForeignKey,
     Text,
     Numeric,
-    UniqueConstraint
+    UniqueConstraint,
+    Date
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import JSONB
@@ -30,7 +31,12 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     coins: Mapped[int] = mapped_column(Integer, default=0)
     experience: Mapped[int] = mapped_column(Integer, default=0)
+    last_login_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    current_streak: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    calendar_notes: Mapped[list["CalendarNote"]] = relationship("CalendarNote", back_populates="user", cascade="all, delete-orphan")
+    daily_logins: Mapped[list["DailyLogin"]] = relationship("DailyLogin", back_populates="user", cascade="all, delete-orphan")
 
     learning_profile: Mapped["LearningProfile"] = relationship("LearningProfile", back_populates="user", uselist=False, cascade="all, delete-orphan")
     sessions: Mapped[list["Session"]] = relationship("Session", back_populates="user", cascade="all, delete-orphan")
@@ -43,6 +49,33 @@ class User(Base):
         # A simple leveling formula, e.g., 1 level per 100 xp. 
         # You can adjust this to whatever curve you'd like!
         return (self.experience // 100) + 1
+
+
+class CalendarNote(Base):
+    __tablename__: str = "calendar_notes"
+
+    note_id: Mapped[str] = mapped_column(String(255), primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(255), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    start_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    end_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    user: Mapped["User"] = relationship("User", back_populates="calendar_notes")
+
+
+class DailyLogin(Base):
+    __tablename__: str = "daily_logins"
+
+    login_id: Mapped[str] = mapped_column(String(255), primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(255), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
+    login_date: Mapped[date] = mapped_column(Date, nullable=False)
+    reward_coins: Mapped[int] = mapped_column(Integer, default=0)
+    streak_count: Mapped[int] = mapped_column(Integer, default=1)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    user: Mapped["User"] = relationship("User", back_populates="daily_logins")
 
 
 class LearningProfile(Base):
@@ -113,6 +146,7 @@ class Task(Base):
     task_text: Mapped[str] = mapped_column(Text, nullable=False)
     key_concepts: Mapped[list[str]] = mapped_column(JSONB, server_default='[]')
     status: Mapped[str] = mapped_column(String(50), default="open", nullable=False)
+    is_rewarded: Mapped[bool] = mapped_column(Boolean, default=False, server_default='false', nullable=False)
 
     document: Mapped["Document"] = relationship("Document", back_populates="tasks")
 
