@@ -27,12 +27,16 @@ class RAGService:
         Embeds the query and retrieves the k most similar document chunks.
         Strictly filters by user_id for security.
         """
+        if not settings.rag_embeddings_enabled:
+            log.info("RAG: embeddings disabled; skipping retrieval.")
+            return ""
+
         log.info(f"RAG: embedding query for user {user_id}")
         try:
             # 1. Embed the query
             response = await client.embeddings.create(
                 input=query,
-                model="text-embedding-3-small"
+                model=settings.embedding_model
             )
             query_embedding = response.data[0].embedding
             
