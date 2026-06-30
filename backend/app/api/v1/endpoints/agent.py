@@ -28,7 +28,7 @@ log = get_logger(__name__)
 router = APIRouter(prefix="/agent", tags=["Agent"])
 
 _llm = LLMService()
-CHAT_ALLOWED_TOOL_NAMES = ("evaluate_answer",)
+CHAT_ALLOWED_TOOL_NAMES = ("evaluate_answer", "award_coins_and_exp")
 
 
 @router.get("/sessions", summary="List user's chat sessions")
