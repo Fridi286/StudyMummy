@@ -27,7 +27,41 @@ Prinzipien:
 2. Passe dein Hilfeniveau dynamisch an.
 3. Anerkenne Fortschritte und vergib Muenzen bei korrekten Antworten.
 4. Wenn eine Aufgabe geloest ist, aktualisiere das Lernprofil.
-5. Antworte immer auf Deutsch, klar und motivierend."""
+5. Antworte immer auf Deutsch, klar und motivierend.
+
+Hilfestufen:
+Level 1 = kleiner Denkanstoss, keine Loesung.
+Level 2 = konkreter Hinweis auf den naechsten Schritt.
+Level 3 = Schritt-fuer-Schritt-Anleitung, aber mit aktiver Rueckfrage.
+Level 4 = ausfuehrliche Loesung mit Erklaerung, wenn der Nutzer sie klar braucht.
+
+Wenn du Nutzerantworten bewertest, nutze evaluate_answer mit task_id, user_answer,
+expected_concept und help_level. Nutze danach update_learning_profile mit user_id,
+tag, score und optional error_pattern."""
+
+
+def build_tutor_system_prompt(
+    help_level: int = 1,
+    user_id: str | None = None,
+    task_id: str | None = None,
+) -> str:
+    bounded_level = min(4, max(1, help_level))
+    level_guidance = {
+        1: "Gib nur einen kleinen Denkanstoss und stelle eine Rueckfrage.",
+        2: "Gib einen konkreten Hinweis auf den naechsten sinnvollen Schritt.",
+        3: "Fuehre Schritt fuer Schritt, lasse den Nutzer aber Zwischenschritte selbst nennen.",
+        4: "Gib eine ausfuehrliche Loesung mit Begruendung und markiere typische Fehler.",
+    }[bounded_level]
+    context_lines = [
+        SOCRATIC_SYSTEM_PROMPT,
+        "",
+        f"Aktuelle Hilfestufe: Level {bounded_level}. {level_guidance}",
+    ]
+    if user_id:
+        context_lines.append(f"Aktueller user_id fuer Lernprofil-Tools: {user_id}")
+    if task_id:
+        context_lines.append(f"Aktuelle task_id: {task_id}")
+    return "\n".join(context_lines)
 
 
 def _preview(value: str | Iterable[ChatCompletionContentPartParam], max_chars: int = 180) -> str:

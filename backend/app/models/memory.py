@@ -24,7 +24,7 @@ class WorkingMemory(BaseModel):
     """Kurzzeitgedächtnis: aktive Aufgabe + aktueller Dialog."""
     session_id: str
     current_task_id: str | None = None
-    help_level: int = Field(default=1, ge=1, le=3)
+    help_level: int = Field(default=1, ge=1, le=4)
     dialog_history: list[DialogTurn] = []
     intermediate_steps: list[str] = []
 
