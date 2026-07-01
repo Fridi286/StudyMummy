@@ -38,7 +38,7 @@ fi
 echo "--------------------------------------------------"
 
 # 2. Check and Install Docker
-if ! command -v docker &> /dev/null; then
+if ! docker --version &> /dev/null 2>&1 && ! /usr/bin/docker --version &> /dev/null 2>&1; then
     echo "⚠️  Docker not found. Installing Docker and Docker Compose..."
     curl -fsSL https://get.docker.com -o get-docker.sh
     sudo sh get-docker.sh
@@ -55,15 +55,34 @@ if [ ! -f .env ]; then
     if [ -f .env.example ]; then
         cp .env.example .env
         echo "📝 Created .env file from .env.example."
-        echo "⚠️  IMPORTANT: Please open .env now and add your real secrets:"
+        echo "--------------------------------------------------"
+        echo "⚠️  ABORTING SETUP: You must edit .env before proceeding!"
+        echo "   Please open .env and add your real secrets:"
         echo "   - OPENAI_API_KEY=sk-..."
         echo "   - CLOUDFLARE_TUNNEL_TOKEN=eyJh..."
+        echo ""
+        echo "   Run: nano .env"
+        echo "   After saving your secrets, run this script again or launch Docker Compose!"
+        echo "--------------------------------------------------"
+        exit 0
     else
         echo "❌ Error: .env.example not found in current directory."
         exit 1
     fi
 else
     echo "✅ .env file already exists."
+    
+    # Check if .env still contains default placeholder secrets
+    if grep -q "sk-5678ijklmnopabcd" .env 2>/dev/null || grep -q "CLOUDFLARE_TUNNEL_TOKEN=$" .env 2>/dev/null; then
+        echo "--------------------------------------------------"
+        echo "⚠️  ABORTING SETUP: Your .env file still contains empty or placeholder secrets!"
+        echo "   Please open .env and add your real OPENAI_API_KEY and CLOUDFLARE_TUNNEL_TOKEN."
+        echo ""
+        echo "   Run: nano .env"
+        echo "   Once configured, run this script again or launch Docker Compose!"
+        echo "--------------------------------------------------"
+        exit 0
+    fi
 fi
 
 echo "--------------------------------------------------"
