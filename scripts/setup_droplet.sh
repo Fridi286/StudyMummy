@@ -38,14 +38,14 @@ fi
 echo "--------------------------------------------------"
 
 # 2. Check and Install Docker
-if ! docker --version &> /dev/null 2>&1 && ! /usr/bin/docker --version &> /dev/null 2>&1; then
+if command -v docker >/dev/null 2>&1 || sudo docker --version >/dev/null 2>&1 || [ -f /usr/bin/docker ] || [ -f /snap/bin/docker ] || [ -f /usr/local/bin/docker ]; then
+    echo "✅ Docker is already installed."
+else
     echo "⚠️  Docker not found. Installing Docker and Docker Compose..."
     curl -fsSL https://get.docker.com -o get-docker.sh
     sudo sh get-docker.sh
     rm -f get-docker.sh
     echo "✅ Docker successfully installed."
-else
-    echo "✅ Docker is already installed."
 fi
 
 echo "--------------------------------------------------"
