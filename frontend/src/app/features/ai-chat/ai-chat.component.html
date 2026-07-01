@@ -1,30 +1,57 @@
 <div class="flex h-full w-full mx-auto gap-4" [ngClass]="showSessions() ? 'p-4 max-w-5xl' : 'p-0'">
 
   <!-- Left Sidebar: Sessions -->
-  <div *ngIf="showSessions()" class="w-64 flex-shrink-0 flex flex-col gap-3">
-    <p-button label="New Chat" icon="pi pi-plus" styleClass="w-full" (onClick)="startNewSession()">
-    </p-button>
+  <div *ngIf="showSessions() && isSidebarOpen()" class="w-full md:w-64 flex-shrink-0 flex flex-col gap-3 z-50"
+       [ngClass]="'fixed inset-0 bg-white/95 backdrop-blur-xl p-4 md:relative md:inset-auto md:bg-transparent md:p-0'">
+    <div class="flex items-center gap-2">
+      <p-button label="New Chat" icon="pi pi-plus" styleClass="flex-1 w-full" (onClick)="onNewChatClick()">
+      </p-button>
+      <button (click)="isSidebarOpen.set(false)" class="md:hidden w-10 h-10 rounded-lg bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600 shrink-0 transition-colors">
+        <i class="pi pi-times"></i>
+      </button>
+    </div>
 
-    <div class="flex-1 bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col">
-      <div class="p-3 border-b border-gray-100">
-        <span class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Previous Chats</span>
+    <div class="flex-1 bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col shadow-sm">
+      <div class="p-3 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+        <span class="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1.5">
+          <i class="pi pi-history text-indigo-500"></i> Previous Chats
+        </span>
+        <span class="text-[11px] font-bold px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">
+          {{sessions().length}}
+        </span>
       </div>
-      <div class="flex-1 overflow-y-auto">
-        <div *ngIf="sessions().length === 0" class="p-4 text-center text-sm text-gray-400">
-          No previous chats yet.
-        </div>
-        <div *ngFor="let s of sessions()" (click)="loadSession(s)"
-          class="group flex items-center gap-2 p-3 cursor-pointer hover:bg-indigo-50 border-b border-gray-50 transition-colors"
-          [class.bg-indigo-50]="activeSessionId() === s.session_id"
-          [class.border-l-2]="activeSessionId() === s.session_id"
-          [class.border-l-indigo-500]="activeSessionId() === s.session_id">
-          <i class="pi pi-comments text-gray-400 text-sm flex-shrink-0"></i>
-          <div class="min-w-0 flex-1">
-            <div class="text-xs text-gray-600 truncate font-medium">Chat session</div>
-            <div class="text-xs text-gray-400">{{formatDate(s.created_at)}}</div>
+
+      <div class="flex-1 overflow-y-auto divide-y divide-gray-100">
+        <div *ngIf="sessions().length === 0" class="flex flex-col items-center justify-center p-8 text-center my-auto">
+          <div class="w-10 h-10 rounded-full bg-gray-50 text-gray-400 flex items-center justify-center mb-2 border border-gray-100">
+            <i class="pi pi-comments text-base"></i>
           </div>
+          <p class="text-xs font-medium text-gray-500">No previous chats yet</p>
+        </div>
+
+        <div *ngFor="let s of sessions()" (click)="loadSession(s)"
+          class="group flex items-center gap-3 p-3 cursor-pointer transition-colors relative"
+          [ngClass]="activeSessionId() === s.session_id ? 'bg-indigo-50/80 border-l-4 border-l-indigo-600' : 'hover:bg-gray-50/80 border-l-4 border-l-transparent'">
+          
+          <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-colors"
+               [ngClass]="activeSessionId() === s.session_id ? 'bg-indigo-600 text-white shadow-sm' : 'bg-gray-100 text-gray-500 group-hover:bg-indigo-100 group-hover:text-indigo-600'">
+            <i class="pi pi-comment text-xs"></i>
+          </div>
+
+          <div class="min-w-0 flex-1">
+            <div class="text-xs font-semibold truncate transition-colors"
+                 [ngClass]="activeSessionId() === s.session_id ? 'text-indigo-950 font-bold' : 'text-gray-700 group-hover:text-gray-900'">
+              Conversation #{{s.session_id ? s.session_id.substring(0, 6) : 'Chat'}}
+            </div>
+            <div class="text-[11px] transition-colors mt-0.5 flex items-center gap-1"
+                 [ngClass]="activeSessionId() === s.session_id ? 'text-indigo-600' : 'text-gray-400'">
+               <i class="pi pi-clock text-[9px]"></i> {{formatDate(s.created_at)}}
+            </div>
+          </div>
+
           <button (click)="deleteSession($event, s)"
-            class="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-red-100 text-gray-400 hover:text-red-500 flex-shrink-0">
+            class="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 shrink-0"
+            pTooltip="Delete Chat" tooltipPosition="left">
             <i class="pi pi-trash text-xs"></i>
           </button>
         </div>
@@ -38,16 +65,20 @@
     <!-- Header -->
     <div *ngIf="showHeader()" class="flex items-center justify-between px-2 pt-2">
       <div class="flex items-center gap-3">
+        <button *ngIf="showSessions()" (click)="isSidebarOpen.set(!isSidebarOpen())" pTooltip="Toggle Chat History" tooltipPosition="bottom"
+          class="w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 transition-colors">
+          <i class="pi" [ngClass]="isSidebarOpen() ? 'pi-sidebar' : 'pi-bars'"></i>
+        </button>
         <div class="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow">
           <i class="pi pi-sparkles text-white text-sm"></i>
         </div>
         <h1 class="text-lg font-bold text-gray-900">StudyMummy AI</h1>
       </div>
-      <div class="flex items-center gap-1" *ngIf="!showSessions()">
-        <button (click)="startNewSession()" pTooltip="New Chat" tooltipPosition="left" class="w-8 h-8 flex items-center justify-center rounded-lg text-indigo-500 hover:bg-indigo-50 transition-colors">
+      <div class="flex items-center gap-1">
+        <button *ngIf="!showSessions() || !isSidebarOpen()" (click)="onNewChatClick()" pTooltip="New Chat" tooltipPosition="left" class="w-8 h-8 flex items-center justify-center rounded-lg text-indigo-500 hover:bg-indigo-50 transition-colors">
           <i class="pi pi-plus"></i>
         </button>
-        <button (click)="closeChat.emit()" class="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 transition-colors">
+        <button *ngIf="!showSessions()" (click)="closeChat.emit()" class="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 transition-colors">
           <i class="pi pi-times"></i>
         </button>
       </div>

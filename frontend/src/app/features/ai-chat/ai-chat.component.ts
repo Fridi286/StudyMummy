@@ -34,6 +34,19 @@ export class AiChatComponent implements OnInit {
   activeTaskId = input<string | undefined>();
   closeChat = output<void>();
 
+  isSidebarOpen = signal<boolean>(typeof window !== 'undefined' ? window.innerWidth >= 768 : true);
+
+  onNewChatClick() {
+    this.startNewSession();
+    this.closeSidebarOnMobile();
+  }
+
+  closeSidebarOnMobile() {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      this.isSidebarOpen.set(false);
+    }
+  }
+
   ngOnInit() {
     this.loadSessions();
     this.startNewSession();
@@ -58,6 +71,7 @@ export class AiChatComponent implements OnInit {
     this.sessionId = session.session_id;
     this.activeSessionId.set(session.session_id);
     this.isLoading.set(true);
+    this.closeSidebarOnMobile();
 
     this.agentService.getSessionMessages(session.session_id).subscribe(msgs => {
       this.messages.set(msgs.map(m => ({ ...m, timestamp: new Date(m.timestamp) })));
