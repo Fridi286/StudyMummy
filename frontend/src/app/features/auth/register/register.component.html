@@ -51,7 +51,7 @@
               name="username"
               [(ngModel)]="userData.username"
               required
-              minlength="3"
+              [minlength]="3"
               class="w-full"
             />
             <label for="username">Username (min. 3 characters)</label>
@@ -81,7 +81,7 @@
               mediumLabel="Average complexity"
               strongLabel="Complex password"
               required
-              minlength="8"
+              [minlength]="8"
               styleClass="w-full"
               inputStyleClass="w-full"
             ></p-password>
