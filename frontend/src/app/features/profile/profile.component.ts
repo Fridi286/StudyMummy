@@ -28,7 +28,6 @@ import { LEVEL_TITLES } from '../../shared/constants/levels';
     FloatLabelModule, ToastModule, FileUploadModule, DialogModule,
     ImageCropperComponent, ProgressBarModule
   ],
-  providers: [MessageService],
   templateUrl: './profile.component.html'
 })
 export class ProfileComponent implements OnInit {

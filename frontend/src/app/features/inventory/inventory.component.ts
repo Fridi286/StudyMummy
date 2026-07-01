@@ -14,7 +14,6 @@ import { AvatarUrlPipe } from '../../shared/pipes/avatar-url.pipe';
   selector: 'app-inventory',
   standalone: true,
   imports: [CommonModule, CardModule, ButtonModule, ToastModule, ProgressSpinnerModule, RouterModule, AvatarUrlPipe],
-  providers: [MessageService],
   templateUrl: './inventory.component.html',
   styleUrls: ['./inventory.component.css']
 })
