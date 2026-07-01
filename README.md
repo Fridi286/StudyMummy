@@ -912,7 +912,8 @@ cp .env.example .env
 # 3. Server starten (Development / Hot-Reloading)
 docker compose --profile dev up --build
 
-# 3b. Alternativ: Server im Production Modus starten (Cloudflare Tunnel HTTPS)
+# 3b. Alternativ: Server im Production Modus starten (z.B. auf DigitalOcean mit Cloudflare Tunnel)
+# Tipp: Auf einem frischen Linux-Server kannst du vorher unser Setup-Skript ausführen: bash scripts/setup_droplet.sh
 docker compose --profile prod up -d --build
 
 # 4. Interaktive API-Dokumentation (in Development unter Port 8000)
