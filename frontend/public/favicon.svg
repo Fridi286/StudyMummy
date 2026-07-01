@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <!-- Smooth Indigo Background -->
+  <rect width="512" height="512" rx="128" fill="#4f46e5" />
+
+  <!-- Mummy Head (Clean White Capsule Silhouette) -->
+  <g transform="translate(0, 10)">
+    <path d="M160 220 C160 130, 352 130, 352 220 V 330 C352 390, 160 390, 160 330 Z" fill="#ffffff" />
+
+    <!-- Dark Gap for the Eyes -->
+    <rect x="160" y="210" width="192" height="64" fill="#1e1b4b" />
+
+    <!-- Glowing Golden Mummy Eyes -->
+    <!-- Left Eye -->
+    <path d="M200 238 C215 238, 225 248, 225 248 C225 248, 215 258, 200 258 C185 258, 175 248, 175 248 C175 248, 185 238, 200 238 Z" fill="#fbbf24" />
+    <circle cx="200" cy="248" r="5" fill="#1e1b4b" />
+    <circle cx="203" cy="246" r="2" fill="#ffffff" />
+    
+    <!-- Right Eye -->
+    <path d="M312 238 C327 238, 337 248, 337 248 C337 248, 327 258, 312 258 C297 258, 287 248, 287 248 C287 248, 297 238, 312 238 Z" fill="#fbbf24" />
+    <circle cx="312" cy="248" r="5" fill="#1e1b4b" />
+    <circle cx="315" cy="246" r="2" fill="#ffffff" />
+
+    <!-- Clean Diagonal Bandage Lines (Indigo cuts creating the wrap effect) -->
+    <!-- Forehead Wrap Line -->
+    <line x1="150" y1="180" x2="362" y2="160" stroke="#4f46e5" stroke-width="12" stroke-linecap="round" />
+    
+    <!-- Lower Face Wrap Lines -->
+    <line x1="150" y1="290" x2="362" y2="320" stroke="#4f46e5" stroke-width="12" stroke-linecap="round" />
+    <line x1="362" y1="285" x2="150" y2="340" stroke="#4f46e5" stroke-width="12" stroke-linecap="round" />
+    <line x1="150" y1="365" x2="362" y2="365" stroke="#4f46e5" stroke-width="12" stroke-linecap="round" />
+
+    <!-- Cute Golden Royal Headdress Accent (Top Center Emblem) -->
+    <circle cx="256" cy="130" r="14" fill="#fbbf24" />
+  </g>
+</svg>

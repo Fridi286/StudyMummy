@@ -6,7 +6,7 @@ from typing import Annotated, ClassVar
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from pydantic import BaseModel, EmailStr, ConfigDict
+from pydantic import BaseModel, EmailStr, ConfigDict, Field
 from fastapi.security import OAuth2PasswordRequestForm
 from PIL import Image
 
@@ -18,11 +18,11 @@ from app.api.dependencies import get_current_user
 router = APIRouter()
 
 class UserCreate(BaseModel):
-    username: str
+    username: str = Field(min_length=3)
     first_name: str
     last_name: str
     email: EmailStr
-    password: str
+    password: str = Field(min_length=8)
 
 class UserResponse(BaseModel):
     user_id: str
@@ -40,11 +40,11 @@ class UserResponse(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)
 
 class UserUpdate(BaseModel):
-    username: str | None = None
+    username: str | None = Field(default=None, min_length=3)
     first_name: str | None = None
     last_name: str | None = None
     email: EmailStr | None = None
-    password: str | None = None
+    password: str | None = Field(default=None, min_length=8)
 
 class UserUpdateResponse(BaseModel):
     user: UserResponse

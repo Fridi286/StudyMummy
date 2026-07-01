@@ -51,9 +51,10 @@
               name="username"
               [(ngModel)]="userData.username"
               required
+              minlength="3"
               class="w-full"
             />
-            <label for="username">Username</label>
+            <label for="username">Username (min. 3 characters)</label>
           </p-floatlabel>
 
           <p-floatlabel class="block w-full md:col-span-2">
@@ -75,11 +76,12 @@
               name="password"
               [(ngModel)]="userData.password"
               [toggleMask]="true"
-              promptLabel="Choose a password"
+              promptLabel="Choose a password (min. 8 chars)"
               weakLabel="Too simple"
               mediumLabel="Average complexity"
               strongLabel="Complex password"
               required
+              minlength="8"
               styleClass="w-full"
               inputStyleClass="w-full"
             ></p-password>
