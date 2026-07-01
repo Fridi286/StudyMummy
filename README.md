@@ -909,10 +909,13 @@ uv pip install -e ".[rag]"
 cp .env.example .env
 # OPENAI_API_KEY=sk-... in .env eintragen
 
-# 3. Server starten
-docker compose up --build
+# 3. Server starten (Development / Hot-Reloading)
+docker compose --profile dev up --build
 
-# 4. Interaktive API-Dokumentation
+# 3b. Alternativ: Server im Production Modus starten (Cloudflare Tunnel HTTPS)
+docker compose --profile prod up -d --build
+
+# 4. Interaktive API-Dokumentation (in Development unter Port 8000)
 open http://localhost:8000/docs
 
 # 5. Tests ausführen (kein API-Key benötigt)
