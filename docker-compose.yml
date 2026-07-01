@@ -92,8 +92,8 @@ services:
       db:
         condition: service_healthy
     volumes:
-      # Use a named volume to persist static uploads in production without overriding code
-      - backend_static:/app/static
+      # Only persist user-uploaded avatars; item images stay baked into the image
+      - backend_static:/app/static/avatars
 
   frontend-prod:
     profiles: [ "prod" ]

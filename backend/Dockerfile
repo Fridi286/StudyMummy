@@ -38,18 +38,13 @@ COPY --from=builder /app/.venv /app/.venv
 # Add virtual environment to PATH
 ENV PATH="/app/.venv/bin:$PATH"
 
-# Copy application source code and configuration
+# Copy application source code, static files and configuration
 COPY app ./app
-# Copy static seed files to a separate location so the named volume doesn't shadow them
-COPY static ./static_seed
+COPY static ./static
 COPY pyproject.toml uv.lock ./
-
-# Copy and set up entrypoint
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
 
 # Expose port
 EXPOSE 8000
 
-# Use entrypoint to seed static files and start the app
-ENTRYPOINT ["/entrypoint.sh"]
+# Run the FastAPI app with Uvicorn in production mode behind Cloudflare Tunnel
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips", "*"]
