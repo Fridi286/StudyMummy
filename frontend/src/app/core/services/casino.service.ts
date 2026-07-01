@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { getApiBaseUrl } from '../config/api.config';
 
 export interface SlotMachineRequest {
   bet_amount: number;
@@ -19,7 +20,7 @@ export interface SlotMachineResponse {
 })
 export class CasinoService {
   private http = inject(HttpClient);
-  private baseUrl = 'http://localhost:8000/api/v1/gambling';
+  private baseUrl = `${getApiBaseUrl()}/api/v1/gambling`;
 
   playSlotMachine(betAmount: number): Observable<SlotMachineResponse> {
     return this.http.post<SlotMachineResponse>(`${this.baseUrl}/slotmachine`, { bet_amount: betAmount });

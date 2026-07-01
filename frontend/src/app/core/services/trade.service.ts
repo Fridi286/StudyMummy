@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { UserPublic } from './social.service';
+import { getApiBaseUrl } from '../config/api.config';
 
 export interface TradeItemCreate {
   item_id: string;
@@ -43,7 +44,7 @@ export interface TradeResponse {
 })
 export class TradeService {
   private http = inject(HttpClient);
-  private apiUrl = 'http://localhost:8000/api/v1/economy/trades';
+  private apiUrl = `${getApiBaseUrl()}/api/v1/economy/trades`;
 
   createTrade(trade: TradeCreate): Observable<TradeResponse> {
     return this.http.post<TradeResponse>(this.apiUrl, trade);

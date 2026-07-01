@@ -5,7 +5,7 @@ import datetime
 from typing import Annotated, ClassVar
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, or_
 from pydantic import BaseModel, EmailStr, ConfigDict, Field
 from fastapi.security import OAuth2PasswordRequestForm
 from PIL import Image
@@ -62,8 +62,8 @@ class Token(BaseModel):
 
 @router.post("/user", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def create_user(user_in: UserCreate, db: Annotated[AsyncSession, Depends(get_async_db)]) -> User:
-    # Check if user with email or username exists
-    stmt = select(User).where((User.email == user_in.email) | (User.username == user_in.username))
+    # Check if user with email or username exists (case-insensitive)
+    stmt = select(User).where((User.email.ilike(user_in.email)) | (User.username.ilike(user_in.username)))
     result = await db.execute(stmt)
     if result.scalars().first():
         raise HTTPException(
@@ -91,8 +91,8 @@ async def login(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()], 
     db: Annotated[AsyncSession, Depends(get_async_db)]
 ) -> Token:
-    # OAuth2 spec requires the field to be named "username", and we expect the actual username.
-    stmt = select(User).where(User.username == form_data.username)
+    # OAuth2 spec requires the field to be named "username", and we check username or email case-insensitively.
+    stmt = select(User).where((User.username.ilike(form_data.username)) | (User.email.ilike(form_data.username)))
     result = await db.execute(stmt)
     user = result.scalars().first()
     
@@ -143,9 +143,13 @@ async def update_user_profile(
         
     # Check for username or email conflicts if they are being updated
     if user_in.username or user_in.email:
+        conditions = []
+        if user_in.email:
+            conditions.append(User.email.ilike(user_in.email))
+        if user_in.username:
+            conditions.append(User.username.ilike(user_in.username))
         conflict_stmt = select(User).where(
-            (User.user_id != user_id) & 
-            ((User.email == user_in.email) | (User.username == user_in.username))
+            (User.user_id != user_id) & or_(*conditions)
         )
         conflict_result = await db.execute(conflict_stmt)
         if conflict_result.scalars().first():

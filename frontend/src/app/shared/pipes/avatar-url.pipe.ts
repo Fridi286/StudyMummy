@@ -1,4 +1,5 @@
 import { Pipe, PipeTransform } from '@angular/core';
+import { getStaticBaseUrl } from '../../core/config/api.config';
 
 @Pipe({
   name: 'avatarUrl',
@@ -10,6 +11,6 @@ export class AvatarUrlPipe implements PipeTransform {
   transform(value?: string | null): string | undefined {
     if (!value) return undefined;
     if (value.startsWith('http')) return value;
-    return `http://localhost:8000${value}?v=${AvatarUrlPipe.sessionCacheBuster}`;
+    return `${getStaticBaseUrl()}${value}?v=${AvatarUrlPipe.sessionCacheBuster}`;
   }
 }

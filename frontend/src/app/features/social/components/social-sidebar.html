@@ -98,7 +98,7 @@
                   <span *ngFor="let i of getOfferedItems(trade)"
                     class="bg-white px-1.5 py-0.5 rounded shadow-sm border border-indigo-100 truncate max-w-full text-indigo-800 font-medium flex items-center gap-1"
                     [title]="i.item.name">
-                    <img *ngIf="i.item.icon_url" [src]="'http://localhost:8000' + i.item.icon_url"
+                    <img *ngIf="i.item.icon_url" [src]="i.item.icon_url | avatarUrl"
                       class="w-3 h-3 object-contain">
                     {{i.quantity}}x {{i.item.name}}
                   </span>
@@ -110,7 +110,7 @@
                   <span *ngFor="let i of getRequestedItems(trade)"
                     class="bg-white px-1.5 py-0.5 rounded shadow-sm border border-emerald-100 truncate max-w-full text-emerald-800 font-medium flex items-center gap-1"
                     [title]="i.item.name">
-                    <img *ngIf="i.item.icon_url" [src]="'http://localhost:8000' + i.item.icon_url"
+                    <img *ngIf="i.item.icon_url" [src]="i.item.icon_url | avatarUrl"
                       class="w-3 h-3 object-contain">
                     {{i.quantity}}x {{i.item.name}}
                   </span>
@@ -160,7 +160,7 @@
                   <span *ngFor="let i of getOfferedItems(trade)"
                     class="bg-white px-1.5 py-0.5 rounded shadow-sm border border-emerald-100 truncate max-w-full text-emerald-800 font-medium flex items-center gap-1"
                     [title]="i.item.name">
-                    <img *ngIf="i.item.icon_url" [src]="'http://localhost:8000' + i.item.icon_url"
+                    <img *ngIf="i.item.icon_url" [src]="i.item.icon_url | avatarUrl"
                       class="w-3 h-3 object-contain">
                     {{i.quantity}}x {{i.item.name}}
                   </span>
@@ -172,7 +172,7 @@
                   <span *ngFor="let i of getRequestedItems(trade)"
                     class="bg-white px-1.5 py-0.5 rounded shadow-sm border border-indigo-100 truncate max-w-full text-indigo-800 font-medium flex items-center gap-1"
                     [title]="i.item.name">
-                    <img *ngIf="i.item.icon_url" [src]="'http://localhost:8000' + i.item.icon_url"
+                    <img *ngIf="i.item.icon_url" [src]="i.item.icon_url | avatarUrl"
                       class="w-3 h-3 object-contain">
                     {{i.quantity}}x {{i.item.name}}
                   </span>

@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { getApiBaseUrl } from '../config/api.config';
 
 export interface Item {
   item_id: string;
@@ -44,7 +45,7 @@ export interface UseItemResponse {
 })
 export class InventoryService {
   private http = inject(HttpClient);
-  private baseUrl = 'http://localhost:8000/api/v1/inventory';
+  private baseUrl = `${getApiBaseUrl()}/api/v1/inventory`;
 
   getInventory(): Observable<UserInventoryResponse> {
     return this.http.get<UserInventoryResponse>(this.baseUrl);

@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { getApiBaseUrl } from '../config/api.config';
 
 export interface DailyLoginStatus {
   last_login_date: string | null;
@@ -25,7 +26,7 @@ export interface DailyLoginHistoryResponse {
 })
 export class DailyLoginService {
   private http = inject(HttpClient);
-  private apiUrl = 'http://localhost:8000/api/v1/daily-login';
+  private apiUrl = `${getApiBaseUrl()}/api/v1/daily-login`;
 
   getStatus(): Observable<DailyLoginStatus> {
     return this.http.get<DailyLoginStatus>(`${this.apiUrl}/status`);

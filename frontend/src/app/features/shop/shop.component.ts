@@ -11,6 +11,7 @@ import { InputNumberModule } from 'primeng/inputnumber';
 import { TabsModule } from 'primeng/tabs';
 import { MessageService } from 'primeng/api';
 import { AuthService } from '../../core/auth/auth.service';
+import { AvatarUrlPipe } from '../../shared/pipes/avatar-url.pipe';
 
 interface ShopItemModel extends Item {
   buyQuantity: number;
@@ -19,7 +20,7 @@ interface ShopItemModel extends Item {
 @Component({
   selector: 'app-shop',
   standalone: true,
-  imports: [CommonModule, FormsModule, CardModule, ButtonModule, ToastModule, ProgressSpinnerModule, InputNumberModule, TabsModule],
+  imports: [CommonModule, FormsModule, CardModule, ButtonModule, ToastModule, ProgressSpinnerModule, InputNumberModule, TabsModule, AvatarUrlPipe],
   providers: [MessageService],
   templateUrl: './shop.component.html'
 })

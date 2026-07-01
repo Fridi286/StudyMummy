@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { getApiBaseUrl } from '../config/api.config';
 
 export interface UserPublic {
   user_id: string;
@@ -41,7 +42,7 @@ export interface ChatMessageResponse {
 })
 export class SocialService {
   private http = inject(HttpClient);
-  private apiUrl = 'http://localhost:8000/api/v1/social';
+  private apiUrl = `${getApiBaseUrl()}/api/v1/social`;
 
   searchUsers(query: string): Observable<UserPublic[]> {
     return this.http.get<UserPublic[]>(`${this.apiUrl}/friends/search`, { params: { query } });

@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { getApiBaseUrl } from '../config/api.config';
 
 export interface DocumentResponse {
   document_id: string;
@@ -99,7 +100,7 @@ export interface PracticeAnswerResponse {
 })
 export class DocumentsService {
   private http = inject(HttpClient);
-  private apiUrl = 'http://localhost:8000/api/v1/documents';
+  private apiUrl = `${getApiBaseUrl()}/api/v1/documents`;
 
   getDocuments(): Observable<DocumentResponse[]> {
     return this.http.get<DocumentResponse[]>(`${this.apiUrl}/`);

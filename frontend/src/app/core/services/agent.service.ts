@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { getApiBaseUrl } from '../config/api.config';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -37,7 +38,7 @@ export interface ChatContextOptions {
 @Injectable({ providedIn: 'root' })
 export class AgentService {
   private http = inject(HttpClient);
-  private apiUrl = 'http://localhost:8000/api/v1/agent';
+  private apiUrl = `${getApiBaseUrl()}/api/v1/agent`;
 
   chat(sessionId: string, message: string, options: ChatContextOptions = {}): Observable<ChatResponse> {
     const request: ChatRequest = {

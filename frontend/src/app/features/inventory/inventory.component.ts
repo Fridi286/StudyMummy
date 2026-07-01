@@ -8,11 +8,12 @@ import { ProgressSpinnerModule } from 'primeng/progressspinner';
 import { MessageService } from 'primeng/api';
 import { AuthService } from '../../core/auth/auth.service';
 import { RouterModule } from '@angular/router';
+import { AvatarUrlPipe } from '../../shared/pipes/avatar-url.pipe';
 
 @Component({
   selector: 'app-inventory',
   standalone: true,
-  imports: [CommonModule, CardModule, ButtonModule, ToastModule, ProgressSpinnerModule, RouterModule],
+  imports: [CommonModule, CardModule, ButtonModule, ToastModule, ProgressSpinnerModule, RouterModule, AvatarUrlPipe],
   providers: [MessageService],
   templateUrl: './inventory.component.html',
   styleUrls: ['./inventory.component.css']
