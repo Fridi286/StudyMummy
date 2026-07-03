@@ -29,7 +29,7 @@
             (uploadHandler)="onUpload($event, fileUpload)" 
             [multiple]="false" 
             accept=".txt,.md,.csv,.json,.xml,.html,.py,.js,.ts,.css,.pdf,.epub,.png,.jpg,.jpeg,.webp,.bmp,.tiff,.tif"
-            maxFileSize="5242880"
+            maxFileSize="20971520"
             uploadLabel="Upload"
             cancelLabel="Clear"
             chooseLabel="Browse"
@@ -40,7 +40,7 @@
                   <div class="flex flex-col items-center justify-center p-8 border-2 border-dashed border-slate-200 rounded-lg bg-slate-50 text-slate-400">
                       <i class="pi pi-cloud-upload text-4xl mb-3 text-indigo-400"></i>
                       <p class="font-medium">Drag and drop a file to here to upload.</p>
-                      <p class="text-xs mt-1">Maximum file size: 5MB.</p>
+                      <p class="text-xs mt-1">Maximum file size: 20MB.</p>
                   </div>
               </ng-template>
               <ng-template pTemplate="file" let-file>
