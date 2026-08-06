@@ -27,6 +27,7 @@ export class ChatWindowComponent {
 
   @Output() openTrade = new EventEmitter<UserPublic>();
   @Output() removeFriend = new EventEmitter<UserPublic>();
+  @Output() backToFriends = new EventEmitter<void>();
 
   _room: ChatroomResponse | null = null;
   chatMenuItems: MenuItem[] = [];

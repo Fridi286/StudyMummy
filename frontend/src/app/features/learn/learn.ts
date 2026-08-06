@@ -40,7 +40,7 @@ export class Learn implements OnInit {
   // Document History
   documents = signal<DocumentResponse[]>([]);
   activeDocument = signal<DocumentResponse | null>(null);
-  isLibraryExpanded = signal<boolean>(true);
+  isLibraryExpanded = signal<boolean>(typeof window !== 'undefined' ? window.innerWidth >= 1280 : true);
 
   // AI Chat Split View State
   isChatExpanded = signal<boolean>(false);
@@ -87,7 +87,7 @@ export class Learn implements OnInit {
           detail: 'Tasks, quizzes, and cheatsheet are ready.'
         });
       }
-    }, { allowSignalWrites: true });
+    });
 
     effect(() => {
       const failure = this.chatService.latestDocumentAnalysisFailed();
@@ -100,7 +100,7 @@ export class Learn implements OnInit {
           detail: failure.message
         });
       }
-    }, { allowSignalWrites: true });
+    });
 
     effect(() => {
       const chat = this.aiChat();
@@ -118,7 +118,7 @@ export class Learn implements OnInit {
           this.chatMenuItems.set(items);
         }
       }
-    }, { allowSignalWrites: true });
+    });
   }
 
   // --- Resizable Split-View Logic ---
@@ -209,6 +209,9 @@ export class Learn implements OnInit {
     }
     this.activeDocument.set(doc);
     this.fetchGeneratedArtifacts(doc.document_id);
+    if (typeof window !== 'undefined' && window.innerWidth < 1280) {
+      this.isLibraryExpanded.set(false);
+    }
   }
 
   setTab(tab: 'quiz' | 'tasks' | 'cheatsheets') {

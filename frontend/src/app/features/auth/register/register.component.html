@@ -1,106 +1,59 @@
 <div
-  class="flex-1 flex items-center justify-center p-4 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-indigo-100 via-white to-slate-50 py-12"
->
+  class="flex-1 flex items-center justify-center p-4 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-indigo-100 via-white to-slate-50 py-12">
   <div class="w-full max-w-xl">
-    <p-card
-      styleClass="shadow-2xl border border-slate-200/60 rounded-3xl p-6 sm:p-8 bg-white/80 backdrop-blur-md"
-    >
+    <p-card styleClass="shadow-2xl border border-slate-200/60 rounded-3xl p-6 sm:p-8 bg-white/80 backdrop-blur-md">
       <div class="text-center mb-10">
-        <h1 class="text-5xl font-extrabold text-indigo-600 tracking-tight mb-3">StudyMummy</h1>
+        <h1 class="text-3xl font-extrabold text-indigo-600 tracking-tight mb-3">StudyMummy</h1>
         <p class="text-slate-600 text-lg">Create your new account to get started.</p>
       </div>
 
       <form (ngSubmit)="onRegister()" class="flex flex-col gap-8">
         @if (errorMessage()) {
-          <div
-            class="p-4 bg-red-50 text-red-700 text-sm rounded-xl border border-red-200 shadow-sm"
-          >
-            {{ errorMessage() }}
-          </div>
+        <div class="p-4 bg-red-50 text-red-700 text-sm rounded-xl border border-red-200 shadow-sm">
+          {{ errorMessage() }}
+        </div>
         }
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mt-2">
           <p-floatlabel class="block w-full">
-            <input
-              pInputText
-              id="firstName"
-              name="firstName"
-              [(ngModel)]="userData.first_name"
-              required
-              class="w-full"
-            />
+            <input pInputText id="firstName" name="firstName" [(ngModel)]="userData.first_name" required
+              class="w-full" />
             <label for="firstName">First Name</label>
           </p-floatlabel>
 
           <p-floatlabel class="block w-full">
-            <input
-              pInputText
-              id="lastName"
-              name="lastName"
-              [(ngModel)]="userData.last_name"
-              required
-              class="w-full"
-            />
+            <input pInputText id="lastName" name="lastName" [(ngModel)]="userData.last_name" required class="w-full" />
             <label for="lastName">Last Name</label>
           </p-floatlabel>
 
           <p-floatlabel class="block w-full md:col-span-2">
-            <input
-              pInputText
-              id="username"
-              name="username"
-              [(ngModel)]="userData.username"
-              required
-              class="w-full"
-            />
-            <label for="username">Username</label>
+            <input pInputText id="username" name="username" [(ngModel)]="userData.username" required [minlength]="3"
+              class="w-full" />
+            <label for="username">Username (min. 3 characters)</label>
           </p-floatlabel>
 
           <p-floatlabel class="block w-full md:col-span-2">
-            <input
-              pInputText
-              type="email"
-              id="email"
-              name="email"
-              [(ngModel)]="userData.email"
-              required
-              class="w-full"
-            />
+            <input pInputText type="email" id="email" name="email" [(ngModel)]="userData.email" required
+              class="w-full" />
             <label for="email">Email Address</label>
           </p-floatlabel>
 
           <p-floatlabel class="block w-full md:col-span-2">
-            <p-password
-              id="password"
-              name="password"
-              [(ngModel)]="userData.password"
-              [toggleMask]="true"
-              promptLabel="Choose a password"
-              weakLabel="Too simple"
-              mediumLabel="Average complexity"
-              strongLabel="Complex password"
-              required
-              styleClass="w-full"
-              inputStyleClass="w-full"
-            ></p-password>
+            <p-password id="password" name="password" [(ngModel)]="userData.password" [toggleMask]="true"
+              promptLabel="Choose a password (min. 8 chars)" weakLabel="Too simple" mediumLabel="Average complexity"
+              strongLabel="Complex password" required [minlength]="8" styleClass="w-full"
+              inputStyleClass="w-full"></p-password>
             <label for="password">Password</label>
           </p-floatlabel>
         </div>
 
-        <p-button
-          type="submit"
-          label="Create Account"
-          [loading]="loading()"
-          class="w-full mt-4"
-          styleClass="w-full py-4 text-lg font-semibold rounded-xl shadow-md"
-        ></p-button>
+        <p-button type="submit" label="Create Account" [loading]="loading()" class="w-full mt-4"
+          styleClass="w-full py-4 text-lg font-semibold rounded-xl shadow-md"></p-button>
       </form>
 
       <div class="mt-8 text-center text-sm text-slate-600 font-medium">
         Already have an account?
-        <a routerLink="/login" class="text-indigo-600 font-bold hover:underline ml-1"
-          >Sign in instead</a
-        >
+        <a routerLink="/login" class="text-indigo-600 font-bold hover:underline ml-1">Sign in instead</a>
       </div>
     </p-card>
   </div>

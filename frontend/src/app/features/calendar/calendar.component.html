@@ -95,7 +95,12 @@
                 </div>
               } @else {
                 @for (note of cell.notes; track note.note_id) {
-                  <div class="text-xs bg-white/90 text-slate-800 rounded-md px-2 py-1 truncate shadow-sm flex justify-between items-center group/note font-medium transition-transform hover:scale-[1.02]">
+                  <!-- Mobile: icon only -->
+                  <div class="sm:hidden flex items-center justify-center">
+                    <span class="w-2 h-2 rounded-full bg-indigo-400 inline-block" [title]="note.title"></span>
+                  </div>
+                  <!-- Desktop: full note row with delete -->
+                  <div class="hidden sm:flex text-xs bg-white/90 text-slate-800 rounded-md px-2 py-1 truncate shadow-sm justify-between items-center group/note font-medium transition-transform hover:scale-[1.02]">
                     <span class="truncate">{{ note.title }}</span>
                     <i class="pi pi-times opacity-0 group-hover/note:opacity-100 hover:text-red-500 ml-1 cursor-pointer transition-opacity"
                        (click)="$event.stopPropagation(); deleteNote($event, note.note_id)"></i>

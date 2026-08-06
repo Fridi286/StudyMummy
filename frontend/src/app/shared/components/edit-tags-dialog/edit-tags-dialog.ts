@@ -32,7 +32,7 @@ export class EditTagsDialog {
         // Reset tags when dialog opens
         this.editTagsValue.set([...doc.tags]);
       }
-    }, { allowSignalWrites: true });
+    });
   }
 
   saveTags() {

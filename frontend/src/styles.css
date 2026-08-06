@@ -124,3 +124,28 @@ router-outlet + * {
     outline: none !important;
     box-shadow: none !important;
 }
+
+/* ─── Mobile Toast Overrides ──────────────────────────────────────────── */
+/* On small screens, make the toast full-width and centered at the top     */
+@media (max-width: 639px) {
+  .p-toast {
+    width: calc(100vw - 2rem) !important;
+    max-width: calc(100vw - 2rem) !important;
+    left: 1rem !important;
+    right: 1rem !important;
+    top: 1rem !important;
+  }
+
+  .p-toast-message {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .p-toast-message-content {
+    padding: 0.75rem 1rem !important;
+  }
+
+  .p-toast-detail {
+    font-size: 0.8rem !important;
+  }
+}

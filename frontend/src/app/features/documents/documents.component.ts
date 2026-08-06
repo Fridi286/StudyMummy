@@ -15,7 +15,6 @@ import { EditTagsDialog } from '../../shared/components/edit-tags-dialog/edit-ta
   selector: 'app-documents',
   standalone: true,
   imports: [CommonModule, CardModule, ButtonModule, ToastModule, FileUploadModule, AutoCompleteModule, FormsModule, ConfirmDialogModule, EditTagsDialog],
-  providers: [MessageService, ConfirmationService],
   templateUrl: './documents.component.html',
   styleUrls: ['./documents.component.css']
 })

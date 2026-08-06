@@ -59,6 +59,15 @@
         },
         "serve": {
           "builder": "@angular/build:dev-server",
+          "options": {
+            "allowedHosts": [
+              "all",
+              "www.studymum.my",
+              "studymum.my",
+              "localhost",
+              "frontend-prod"
+            ]
+          },
           "configurations": {
             "production": {
               "buildTarget": "frontend:build:production"

@@ -38,12 +38,13 @@ COPY --from=builder /app/.venv /app/.venv
 # Add virtual environment to PATH
 ENV PATH="/app/.venv/bin:$PATH"
 
-# Copy application source code and configuration
+# Copy application source code, static files and configuration
 COPY app ./app
+COPY static ./static
 COPY pyproject.toml uv.lock ./
 
 # Expose port
 EXPOSE 8000
 
-# Run the FastAPI app with Uvicorn
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run the FastAPI app with Uvicorn in production mode behind Cloudflare Tunnel
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips", "*"]

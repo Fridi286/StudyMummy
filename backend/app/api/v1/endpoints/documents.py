@@ -35,7 +35,7 @@ from app.websockets.manager import manager
 router = APIRouter()
 
 UPLOAD_DIR = "data/documents"
-MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB
+MAX_FILE_SIZE = 20 * 1024 * 1024  # 20 MB
 
 # Ensure upload directory exists
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -71,7 +71,7 @@ async def upload_document(
     if file.size is not None and file.size > MAX_FILE_SIZE:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail="File size exceeds the 5MB limit."
+            detail="File size exceeds the 20MB limit."
         )
 
     # Generate a unique filename to prevent collisions

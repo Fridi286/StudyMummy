@@ -59,10 +59,10 @@ Die API gibt neben der Tutorantwort auch die Entscheidung und den kompakten Agen
 ## Schnellstart mit Docker
 
 1. `.env.example` nach `.env` kopieren und die Modellkonfiguration anpassen.
-2. Anwendung starten:
+2. Entwicklungsumgebung mit Hot Reloading starten:
 
 ```bash
-docker compose up --build
+docker compose --profile dev up --build
 ```
 
 Danach sind erreichbar:
@@ -72,6 +72,14 @@ Danach sind erreichbar:
 - OpenAPI-Dokumentation: `http://localhost:8000/docs`
 
 Die PostgreSQL-Verbindung wird durch Docker Compose eingerichtet. Lokal verwendet das Beispiel Port `5433`, innerhalb des Compose-Netzes Port `5432`.
+
+Produktiv werden Backend, Nginx-Frontend und Cloudflare Tunnel über das Produktionsprofil gestartet:
+
+```bash
+docker compose --profile prod up -d --build
+```
+
+Für einen neuen Linux-Server steht vorbereitend `scripts/setup_droplet.sh` zur Verfügung.
 
 ## Lokale Entwicklung
 

@@ -27,7 +27,7 @@ export class Social {
   displayTradeModal = signal(false);
   tradeFriend = signal<UserPublic | null>(null);
 
-  onRoomSelected(room: ChatroomResponse) {
+  onRoomSelected(room: ChatroomResponse | null) {
     this.activeChatroom.set(room);
   }
 

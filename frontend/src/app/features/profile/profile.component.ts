@@ -28,7 +28,6 @@ import { LEVEL_TITLES } from '../../shared/constants/levels';
     FloatLabelModule, ToastModule, FileUploadModule, DialogModule,
     ImageCropperComponent, ProgressBarModule
   ],
-  providers: [MessageService],
   templateUrl: './profile.component.html'
 })
 export class ProfileComponent implements OnInit {
@@ -163,14 +162,27 @@ export class ProfileComponent implements OnInit {
     const currentEdit = this.editData();
 
     // Validation
+    if (currentEdit.username && currentEdit.username.length < 3) {
+      this.messageService.add({ severity: 'warn', summary: 'Validation Error', detail: 'Username must be at least 3 characters long' });
+      this.saving.set(false);
+      return;
+    }
+
     if (currentEdit.email !== currentEdit.confirm_email) {
       this.messageService.add({ severity: 'warn', summary: 'Validation Error', detail: 'Email addresses do not match' });
+      this.saving.set(false);
       return;
     }
 
     if (currentEdit.password || currentEdit.confirm_password) {
+      if (currentEdit.password.length < 8) {
+        this.messageService.add({ severity: 'warn', summary: 'Validation Error', detail: 'Password must be at least 8 characters long' });
+        this.saving.set(false);
+        return;
+      }
       if (currentEdit.password !== currentEdit.confirm_password) {
         this.messageService.add({ severity: 'warn', summary: 'Validation Error', detail: 'Passwords do not match' });
+        this.saving.set(false);
         return;
       }
     }

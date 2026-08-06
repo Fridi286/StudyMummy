@@ -42,6 +42,15 @@ export class RegisterComponent {
   onRegister() {
     if (!this.userData.username || !this.userData.email || !this.userData.password) return;
 
+    if (this.userData.username.length < 3) {
+      this.errorMessage.set('Username must be at least 3 characters long.');
+      return;
+    }
+    if (this.userData.password.length < 8) {
+      this.errorMessage.set('Password must be at least 8 characters long.');
+      return;
+    }
+
     this.loading.set(true);
     this.errorMessage.set('');
 

@@ -1,9 +1,4 @@
-<div
-  class="flex flex-col transition-all duration-500 shrink-0 ease-in-out origin-left h-[300px] xl:h-full relative z-20"
-  [class.pointer-events-none]="isResizing()"
-  [class.transition-none]="isResizing()"
-  [ngClass]="isLibraryExpanded() ? 'xl:opacity-100 xl:scale-x-100' : 'xl:w-0 xl:opacity-0 xl:m-0 xl:scale-x-0'"
-  [style.width.px]="isLibraryExpanded() ? libraryWidth() : null">
+<div class="flex flex-col h-full w-full relative z-20">
 
   @if (isLibraryExpanded()) {
   <!-- RESIZER HANDLE (Invisible Grab Area on Right Edge) -->
@@ -18,15 +13,15 @@
   </div>
   }
 
-  <div class="flex-1 flex flex-col w-full h-full bg-white/90 backdrop-blur-xl rounded-3xl border border-slate-200/60 shadow-xl overflow-hidden min-w-0">
+  <div class="flex-1 flex flex-col w-full h-full bg-white xl:bg-white/90 xl:backdrop-blur-xl xl:rounded-3xl xl:border xl:border-slate-200/60 xl:shadow-xl overflow-hidden min-w-0">
     <!-- Header & Upload -->
     <div class="p-6 border-b border-slate-100 bg-white/50 flex justify-between items-center shrink-0">
       <h2 class="text-xl font-extrabold text-slate-800">Study Library</h2>
-    <button (click)="toggleLibrary.emit(false)"
-      class="hidden xl:flex text-slate-400 hover:text-slate-600 bg-slate-50 hover:bg-slate-200 rounded-lg w-8 h-8 items-center justify-center transition-colors">
-      <i class="pi pi-angle-left"></i>
-    </button>
-  </div>
+      <button (click)="toggleLibrary.emit(false)"
+        class="flex text-slate-400 hover:text-slate-600 bg-slate-50 hover:bg-slate-200 rounded-lg w-8 h-8 items-center justify-center transition-colors">
+        <i class="pi pi-times"></i>
+      </button>
+    </div>
 
   <div class="p-4 border-b border-slate-100 bg-white/50">
     <input type="file" #fileInput (change)="fileUpload.emit($event)" class="hidden"

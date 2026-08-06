@@ -17,7 +17,6 @@ const EMOJIS = ['📚', '🎓', '✏️', '☕', '🧠'];
   selector: 'app-slots',
   standalone: true,
   imports: [CommonModule, FormsModule, ButtonModule, InputNumberModule, ToastModule],
-  providers: [MessageService],
   templateUrl: './slots.component.html'
 })
 export class SlotsComponent implements OnInit, OnDestroy {
