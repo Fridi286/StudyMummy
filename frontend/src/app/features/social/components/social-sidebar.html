@@ -1,7 +1,7 @@
 <!-- Search Bar -->
 <div class="card bg-white p-4 rounded-xl shadow-sm border border-gray-100">
   <h3 class="text-lg font-semibold mb-3">Add Friends</h3>
-  <p-autoComplete [(ngModel)]="searchQuery" [suggestions]="searchResults()" (completeMethod)="searchUsers($event)"
+  <p-autocomplete [(ngModel)]="searchQuery" [suggestions]="searchResults()" (completeMethod)="searchUsers($event)"
     (onSelect)="onUserSelect($event)" field="username" placeholder="Search username..." styleClass="w-full"
     [inputStyle]="{'width': '100%'}">
     <ng-template let-user pTemplate="item">
@@ -18,7 +18,7 @@
           (onClick)="sendFriendRequest(user); $event.stopPropagation()"></p-button>
       </div>
     </ng-template>
-  </p-autoComplete>
+  </p-autocomplete>
 </div>
 
 <!-- Pending Requests -->
@@ -98,7 +98,7 @@
                   <span *ngFor="let i of getOfferedItems(trade)"
                     class="bg-white px-1.5 py-0.5 rounded shadow-sm border border-indigo-100 truncate max-w-full text-indigo-800 font-medium flex items-center gap-1"
                     [title]="i.item.name">
-                    <img *ngIf="i.item.icon_url" [src]="'http://localhost:8000' + i.item.icon_url"
+                    <img *ngIf="i.item.icon_url" [src]="i.item.icon_url | backendAssetUrl"
                       class="w-3 h-3 object-contain">
                     {{i.quantity}}x {{i.item.name}}
                   </span>
@@ -110,7 +110,7 @@
                   <span *ngFor="let i of getRequestedItems(trade)"
                     class="bg-white px-1.5 py-0.5 rounded shadow-sm border border-emerald-100 truncate max-w-full text-emerald-800 font-medium flex items-center gap-1"
                     [title]="i.item.name">
-                    <img *ngIf="i.item.icon_url" [src]="'http://localhost:8000' + i.item.icon_url"
+                    <img *ngIf="i.item.icon_url" [src]="i.item.icon_url | backendAssetUrl"
                       class="w-3 h-3 object-contain">
                     {{i.quantity}}x {{i.item.name}}
                   </span>
@@ -160,7 +160,7 @@
                   <span *ngFor="let i of getOfferedItems(trade)"
                     class="bg-white px-1.5 py-0.5 rounded shadow-sm border border-emerald-100 truncate max-w-full text-emerald-800 font-medium flex items-center gap-1"
                     [title]="i.item.name">
-                    <img *ngIf="i.item.icon_url" [src]="'http://localhost:8000' + i.item.icon_url"
+                    <img *ngIf="i.item.icon_url" [src]="i.item.icon_url | backendAssetUrl"
                       class="w-3 h-3 object-contain">
                     {{i.quantity}}x {{i.item.name}}
                   </span>
@@ -172,7 +172,7 @@
                   <span *ngFor="let i of getRequestedItems(trade)"
                     class="bg-white px-1.5 py-0.5 rounded shadow-sm border border-indigo-100 truncate max-w-full text-indigo-800 font-medium flex items-center gap-1"
                     [title]="i.item.name">
-                    <img *ngIf="i.item.icon_url" [src]="'http://localhost:8000' + i.item.icon_url"
+                    <img *ngIf="i.item.icon_url" [src]="i.item.icon_url | backendAssetUrl"
                       class="w-3 h-3 object-contain">
                     {{i.quantity}}x {{i.item.name}}
                   </span>

@@ -69,8 +69,8 @@ def create_app() -> FastAPI:
         version=settings.app_version,
         description=(
             "StudyMummy – Agentic AI Learning Platform API\n\n"
-            "Übungsblatt 03 (HAW Hamburg, WP Agentic AI, SS 2026)\n"
-            "Implementiert: LLM-Anbindung, Tool Use & RAG-Grundgerüst."
+            "Observable Multi-Agent-Orchestrierung, adaptive Tutorplanung, "
+            "kontrolliertes Tool-Calling und dokumentgestütztes Lernen."
         ),
         lifespan=lifespan,
         docs_url="/docs",

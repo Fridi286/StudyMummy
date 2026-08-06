@@ -16,7 +16,7 @@
         
         <div class="mb-5">
           <label class="block text-sm font-semibold text-slate-700 mb-2">Custom Tags (Optional)</label>
-          <p-autoComplete [(ngModel)]="uploadTags" [multiple]="true" [typeahead]="false" placeholder="e.g. Midterm 2026, Prof. Smith"></p-autoComplete>
+          <p-autocomplete [(ngModel)]="uploadTags" [multiple]="true" [typeahead]="false" placeholder="e.g. Midterm 2026, Prof. Smith"></p-autocomplete>
           <p class="text-xs text-slate-500 mt-2">The AI will also automatically extract semantic tags (like 'Integration by Parts') from the document.</p>
         </div>
 
@@ -129,4 +129,4 @@
   (tagsUpdated)="loadDocuments()">
 </app-edit-tags-dialog>
 
-<p-confirmDialog [style]="{width: '450px'}"></p-confirmDialog>
+<p-confirmdialog [style]="{width: '450px'}"></p-confirmdialog>

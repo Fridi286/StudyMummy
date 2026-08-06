@@ -12,6 +12,7 @@ describe('TasksTab', () => {
     }).compileComponents();
 
     fixture = TestBed.createComponent(TasksTab);
+    fixture.componentRef.setInput('tasks', []);
     component = fixture.componentInstance;
     await fixture.whenStable();
   });

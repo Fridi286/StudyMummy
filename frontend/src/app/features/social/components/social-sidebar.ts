@@ -11,11 +11,12 @@ import { AuthService } from '../../../core/auth/auth.service';
 import { ChatService } from '../../../core/services/chat.service';
 import { AvatarUrlPipe } from '../../../shared/pipes/avatar-url.pipe';
 import { InitialsPipe } from '../../../shared/pipes/initials.pipe';
+import { BackendAssetUrlPipe } from '../../../shared/pipes/backend-asset-url.pipe';
 
 @Component({
   selector: 'app-social-sidebar',
   standalone: true,
-  imports: [CommonModule, FormsModule, AutoCompleteModule, ButtonModule, AvatarModule, AvatarUrlPipe, InitialsPipe],
+  imports: [CommonModule, FormsModule, AutoCompleteModule, ButtonModule, AvatarModule, AvatarUrlPipe, InitialsPipe, BackendAssetUrlPipe],
   templateUrl: './social-sidebar.html'
 })
 export class SocialSidebarComponent implements OnInit {

@@ -9,11 +9,12 @@ import { TradeService, TradeItemCreate } from '../../../core/services/trade.serv
 import { InventoryService, InventoryItem } from '../../../core/services/inventory.service';
 import { AuthService } from '../../../core/auth/auth.service';
 import { UserPublic } from '../../../core/services/social.service';
+import { BackendAssetUrlPipe } from '../../../shared/pipes/backend-asset-url.pipe';
 
 @Component({
   selector: 'app-trade-dialog',
   standalone: true,
-  imports: [CommonModule, FormsModule, DialogModule, ButtonModule, InputNumberModule],
+  imports: [CommonModule, FormsModule, DialogModule, ButtonModule, InputNumberModule, BackendAssetUrlPipe],
   templateUrl: './trade-dialog.html'
 })
 export class TradeDialogComponent {

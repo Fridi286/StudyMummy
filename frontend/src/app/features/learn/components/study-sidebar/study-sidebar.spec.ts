@@ -12,6 +12,10 @@ describe('StudySidebar', () => {
     }).compileComponents();
 
     fixture = TestBed.createComponent(StudySidebar);
+    fixture.componentRef.setInput('documents', []);
+    fixture.componentRef.setInput('activeDocument', null);
+    fixture.componentRef.setInput('isAnalyzing', false);
+    fixture.componentRef.setInput('isLibraryExpanded', true);
     component = fixture.componentInstance;
     await fixture.whenStable();
   });

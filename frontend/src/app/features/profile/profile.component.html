@@ -3,7 +3,7 @@
   class="flex-1 w-full flex flex-col items-center px-4 py-6 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-indigo-50 via-white to-slate-50">
   @if (loading()) {
   <div class="flex flex-col items-center justify-center gap-4 mt-20">
-    <p-progressSpinner styleClass="w-12 h-12" strokeWidth="4" animationDuration=".5s"></p-progressSpinner>
+    <p-progressspinner styleClass="w-12 h-12" strokeWidth="4" animationDuration=".5s"></p-progressspinner>
     <p class="text-slate-500 font-medium">Loading profile...</p>
   </div>
   } @else if (error()) {
@@ -67,7 +67,7 @@
               <span class="text-sm font-extrabold text-slate-800">Level {{ profileData()?.level }} ({{ levelTitle }})</span>
               <span class="text-xs font-bold text-indigo-500">{{ expProgress }} / 100 XP</span>
             </div>
-            <p-progressBar [value]="expProgress" [showValue]="false" styleClass="w-full h-2.5 rounded-full bg-slate-100 shadow-inner" color="#6366f1"></p-progressBar>
+            <p-progressbar [value]="expProgress" [showValue]="false" styleClass="w-full h-2.5 rounded-full bg-slate-100 shadow-inner" color="#6366f1"></p-progressbar>
             <p class="text-[10px] text-slate-400 mt-1 font-semibold uppercase tracking-wider">Total Exp: {{ profileData()?.experience }} XP</p>
           </div>
         </div>

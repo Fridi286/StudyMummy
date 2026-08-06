@@ -1,6 +1,5 @@
-"""
-Agent-Endpunkte: Chat, Dokument-Upload, Quiz, Cheatsheet.
-"""
+"""Agent API: observable multi-agent tutoring and lightweight text extraction."""
+from datetime import datetime, timezone
 from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from app.models.agent import (
@@ -9,14 +8,15 @@ from app.models.agent import (
     QuizRequest, QuizResponse,
     CheatsheetRequest, CheatsheetResponse,
 )
-from app.services.llm_service import LLMService, build_tutor_system_prompt, filter_user_input
 from app.services.llm_service import LLMService, filter_user_input
+from app.agents.orchestrator import AgentOrchestrator
+from app.agents.protocol import AgentContext, AgentStep
 from app.services.rag_service import RAGService, get_rag_service
 from app.core.context import current_user_id
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_async_db
 from app.api.dependencies import get_current_user
-from app.db.models import User
+from app.db.models import Document, Task, User
 from app.services.session_service import (
     get_or_create_session, append_dialog,
     get_dialog_as_messages, update_session_context,
@@ -29,7 +29,45 @@ log = get_logger(__name__)
 router = APIRouter(prefix="/agent", tags=["Agent"])
 
 _llm = LLMService()
-CHAT_ALLOWED_TOOL_NAMES = ("evaluate_answer", "award_coins_and_exp", "add_calendar_note")
+_orchestrator = AgentOrchestrator(_llm)
+
+
+async def _resolve_study_context(
+    db: AsyncSession,
+    user_id: str,
+    task_id: str | None,
+    document_id: str | None,
+) -> tuple[str | None, str | None]:
+    """Resolve trusted task context and enforce document ownership."""
+    if task_id:
+        stmt = (
+            select(Task)
+            .join(Document, Document.document_id == Task.document_id)
+            .where(Task.task_id == task_id, Document.user_id == user_id)
+        )
+        task = (await db.execute(stmt)).scalars().first()
+        if task is None:
+            raise HTTPException(status_code=404, detail="Task not found")
+        if document_id and document_id != task.document_id:
+            raise HTTPException(status_code=400, detail="Task does not belong to the selected document")
+        context = "\n".join(
+            [
+                f"Aufgabe: {task.task_text}",
+                f"Schwierigkeit: {task.difficulty}/5",
+                f"Schluesselkonzepte: {', '.join(task.key_concepts) if task.key_concepts else 'nicht angegeben'}",
+                f"Bearbeitungsstatus: {task.status}",
+            ]
+        )
+        return task.document_id, context
+
+    if document_id:
+        stmt = select(Document.document_id).where(
+            Document.document_id == document_id,
+            Document.user_id == user_id,
+        )
+        if (await db.execute(stmt)).scalar_one_or_none() is None:
+            raise HTTPException(status_code=404, detail="Document not found")
+    return document_id, None
 
 
 def _infer_help_level(message: str, current_level: int) -> int:
@@ -128,63 +166,83 @@ async def chat(
         message = filter_user_input(req.message)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    # Set context variable for tools
-    current_user_id.set(current_user.user_id)
-
-    # Working Memory auffrischen
-    session = await get_or_create_session(db, req.session_id, current_user.user_id, req.task_id)
+    document_id, task_context = await _resolve_study_context(
+        db,
+        current_user.user_id,
+        req.task_id,
+        req.document_id,
+    )
+    try:
+        session = await get_or_create_session(db, req.session_id, current_user.user_id, req.task_id)
+    except PermissionError as exc:
+        raise HTTPException(status_code=404, detail="Session not found") from exc
     help_level = _infer_help_level(req.message, session.help_level)
-    active_task_id = req.task_id or session.current_task_id
+    clear_current_task = req.document_id is not None and req.task_id is None
+    active_task_id = None if clear_current_task else (req.task_id or session.current_task_id)
     session = await update_session_context(
         db,
         req.session_id,
         current_user.user_id,
         current_task_id=active_task_id,
         help_level=help_level,
+        clear_current_task=clear_current_task,
     )
 
-    # Nachricht ins Gedächtnis
     await append_dialog(db, req.session_id, "user", message)
 
     # RAG-Kontext holen (pgvector)
-    rag_context = await rag.retrieve(db, current_user.user_id, message)
-
-    from datetime import datetime
-    current_time_str = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
-    context = f"HEUTIGES DATUM UND UHRZEIT: {current_time_str}\n\n"
-
-    if session.current_task_id:
-        context += f"AKTUELLE AUFGABE (task_id): {session.current_task_id}\n(WICHTIG: Wenn du Tools aufrufst, die eine task_id erwarten, nutze diese ID!)\n\n"
-
-    if req.extra_context:
-        context += f"[Aktueller Aufgaben-Kontext]\n{req.extra_context}\n\n"
-
-    if rag_context:
-        context += rag_context
-
-    # Dialog-History für LLM
-    messages = await get_dialog_as_messages(db, req.session_id, current_user.user_id)
-
-    # LLM-Aufruf mit Tool Use
-    reply, tools_called = await _llm.chat_with_tools(
-        messages=messages,
-        system_prompt=build_tutor_system_prompt(
-            help_level=session.help_level,
-            user_id=current_user.user_id,
-            task_id=session.current_task_id,
-        ),
-        extra_context=context or None,
-        allowed_tool_names=CHAT_ALLOWED_TOOL_NAMES,
+    retrieval_query = f"{task_context}\n\nNutzerfrage: {message}" if task_context else message
+    rag_context = await rag.retrieve(
+        db,
+        current_user.user_id,
+        retrieval_query,
+        document_id=document_id,
     )
 
-    await append_dialog(db, req.session_id, "assistant", reply)
+    messages = await get_dialog_as_messages(db, req.session_id, current_user.user_id)
+    # Bind identity only for the execution window of side-effecting tools.
+    user_context_token = current_user_id.set(current_user.user_id)
+    try:
+        result = await _orchestrator.run(
+            AgentContext(
+                user_id=current_user.user_id,
+                session_id=req.session_id,
+                message=message,
+                help_level=session.help_level,
+                current_task_id=session.current_task_id,
+                document_id=document_id,
+                task_context=task_context,
+                extra_context=req.extra_context,
+                rag_context=rag_context,
+                history=messages,
+                current_time=datetime.now(timezone.utc).isoformat(),
+            )
+        )
+    finally:
+        current_user_id.reset(user_context_token)
 
+    await append_dialog(
+        db,
+        req.session_id,
+        "assistant",
+        result.response,
+        action_taken=result.plan.action.value,
+    )
+    result.steps.append(AgentStep(
+        agent="memory",
+        phase="remember",
+        summary="Tutorantwort und ausgeführte Aktion im episodischen Sitzungsverlauf gespeichert.",
+    ))
     return ChatResponse(
         session_id=req.session_id,
-        message=reply,
-        action_taken=tools_called[-1] if tools_called else None,
-        tool_calls=tools_called,
+        message=result.response,
+        action_taken=result.plan.action.value,
+        tool_calls=result.tool_calls,
         trace_id=get_trace_id(),
+        decision=result.plan,
+        agent_trace=result.steps,
+        agents_involved=result.agents_involved,
+        reviewed=result.reviewed,
     )
 
 

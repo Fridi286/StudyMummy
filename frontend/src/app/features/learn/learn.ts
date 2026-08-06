@@ -204,6 +204,9 @@ export class Learn implements OnInit {
   }
 
   selectDocument(doc: DocumentResponse) {
+    if (this.activeDocument()?.document_id !== doc.document_id) {
+      this.activeChatTaskId.set(undefined);
+    }
     this.activeDocument.set(doc);
     this.fetchGeneratedArtifacts(doc.document_id);
   }

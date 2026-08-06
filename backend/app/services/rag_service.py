@@ -22,7 +22,15 @@ class RAGService:
     RAG-Service using pgvector for similarity search.
     """
     
-    async def retrieve(self, db: AsyncSession, user_id: str, query: str, tags: list[str] | None = None, top_k: int = 3) -> str:
+    async def retrieve(
+        self,
+        db: AsyncSession,
+        user_id: str,
+        query: str,
+        tags: list[str] | None = None,
+        document_id: str | None = None,
+        top_k: int = 3,
+    ) -> str:
         """
         Embeds the query and retrieves the k most similar document chunks.
         Strictly filters by user_id for security.
@@ -44,6 +52,9 @@ class RAGService:
             stmt = select(DocumentChunk).where(
                 DocumentChunk.user_id == user_id
             )
+
+            if document_id:
+                stmt = stmt.where(DocumentChunk.document_id == document_id)
             
             if tags:
                 # Filter to chunks that belong to documents with all specified tags

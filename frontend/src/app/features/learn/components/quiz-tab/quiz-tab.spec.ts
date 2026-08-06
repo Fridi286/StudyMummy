@@ -12,6 +12,10 @@ describe('QuizTab', () => {
     }).compileComponents();
 
     fixture = TestBed.createComponent(QuizTab);
+    fixture.componentRef.setInput('quizzes', []);
+    fixture.componentRef.setInput('quizAttempts', {});
+    fixture.componentRef.setInput('selectedAnswers', {});
+    fixture.componentRef.setInput('isSubmittingQuiz', {});
     component = fixture.componentInstance;
     await fixture.whenStable();
   });

@@ -2,22 +2,29 @@
 Request/Response-Modelle für alle Agent-Endpunkte.
 """
 from typing import Annotated, Optional
-from pydantic import BaseModel, StringConstraints
+from pydantic import BaseModel, Field, StringConstraints
+
+from app.agents.protocol import AgentPlan, AgentStep
 
 
 class ChatRequest(BaseModel):
     session_id: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
     message: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
-    task_id: Optional[str] = None
-    extra_context: Optional[str] = None
+    task_id: Annotated[Optional[str], StringConstraints(strip_whitespace=True, max_length=255)] = None
+    document_id: Annotated[Optional[str], StringConstraints(strip_whitespace=True, max_length=255)] = None
+    extra_context: Annotated[Optional[str], StringConstraints(strip_whitespace=True, max_length=12000)] = None
 
 
 class ChatResponse(BaseModel):
     session_id: str
     message: str
     action_taken: Optional[str] = None   # z. B. "hint_given", "task_solved"
-    tool_calls: list[str] = []
+    tool_calls: list[str] = Field(default_factory=list)
     trace_id: str
+    decision: AgentPlan
+    agent_trace: list[AgentStep] = Field(default_factory=list)
+    agents_involved: list[str] = Field(default_factory=list)
+    reviewed: bool = False
 
 
 class ExtractedTask(BaseModel):

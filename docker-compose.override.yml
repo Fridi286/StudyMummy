@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   web:
     # Override the default command to enable Uvicorn hot-reloading

@@ -35,13 +35,13 @@
         <div class="flex gap-2 justify-center flex-wrap">
           <p-button label="Min" size="small" severity="secondary" variant="text" (onClick)="setBet(10)"
             [disabled]="isSpinning()"></p-button>
-          <p-inputNumber [(ngModel)]="betAmount" [min]="1" [max]="userCoins() || 1" [showButtons]="true"
+          <p-inputnumber [(ngModel)]="betAmount" [min]="1" [max]="userCoins() || 1" [showButtons]="true"
             buttonLayout="horizontal" spinnerMode="horizontal" decrementButtonClass="p-button-secondary p-button-text"
             incrementButtonClass="p-button-secondary p-button-text" incrementButtonIcon="pi pi-plus"
             decrementButtonIcon="pi pi-minus"
             inputStyleClass="w-24 text-center font-bold text-slate-700 bg-slate-50 border-none"
             [disabled]="isSpinning()">
-          </p-inputNumber>
+          </p-inputnumber>
           <p-button label="Max" size="small" severity="secondary" variant="text" (onClick)="setBet(userCoins() || 10)"
             [disabled]="isSpinning()"></p-button>
         </div>

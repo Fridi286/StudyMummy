@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 from datetime import datetime
 from app.models.inventory import ItemResponse
 from app.api.v1.endpoints.social import UserPublic
@@ -11,13 +11,12 @@ class TradeItemCreate(TradeItemBase):
     owner_id: str
 
 class TradeItemResponse(TradeItemBase):
+    model_config = ConfigDict(from_attributes=True)
+
     trade_item_id: str
     trade_id: str
     owner_id: str
     item: ItemResponse
-
-    class Config:
-        from_attributes = True
 
 class TradeBase(BaseModel):
     receiver_id: str
@@ -25,9 +24,11 @@ class TradeBase(BaseModel):
     receiver_coins: int = 0
 
 class TradeCreate(TradeBase):
-    trade_items: list[TradeItemCreate] = []
+    trade_items: list[TradeItemCreate] = Field(default_factory=list)
 
 class TradeResponse(TradeBase):
+    model_config = ConfigDict(from_attributes=True)
+
     trade_id: str
     sender_id: str
     status: str
@@ -37,6 +38,3 @@ class TradeResponse(TradeBase):
     sender: UserPublic
     receiver: UserPublic
     trade_items: list[TradeItemResponse]
-
-    class Config:
-        from_attributes = True

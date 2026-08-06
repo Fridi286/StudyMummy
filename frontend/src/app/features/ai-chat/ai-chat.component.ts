@@ -32,6 +32,7 @@ export class AiChatComponent implements OnInit {
   showHeader = input<boolean>(true);
   extraContext = input<string>('');
   activeTaskId = input<string | undefined>();
+  activeDocumentId = input<string | undefined>();
   closeChat = output<void>();
 
   ngOnInit() {
@@ -114,6 +115,7 @@ export class AiChatComponent implements OnInit {
     this.agentService.chat(this.sessionId, text, {
       extraContext: this.extraContext(),
       taskId: this.activeTaskId(),
+      documentId: this.activeDocumentId(),
     }).subscribe({
       next: (res) => {
         this.messages.update(msgs => [...msgs, {

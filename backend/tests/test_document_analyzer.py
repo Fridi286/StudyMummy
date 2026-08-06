@@ -38,6 +38,7 @@ async def test_successful_analysis_pipeline():
 
     # 2. Mock Database Session
     mock_db = AsyncMock()
+    mock_db.add = MagicMock()
     # Mock db.execute().scalars().first() to simulate existing Subject/Topic
     mock_result = MagicMock()
     mock_subject = MagicMock(subject_id="sub_1")
@@ -99,7 +100,8 @@ async def test_successful_analysis_pipeline():
         # Verify WebSocket notification
         mock_send.assert_awaited_once_with("user_1", {
             "type": "DOCUMENT_ANALYZED",
-            "message": "doc_123"
+            "message": "doc_123",
+            "document_id": "doc_123",
         })
 
 @pytest.mark.asyncio

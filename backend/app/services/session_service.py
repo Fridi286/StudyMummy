@@ -21,6 +21,10 @@ async def get_or_create_session(db: AsyncSession, session_id: str, user_id: str,
     result = await db.execute(stmt)
     db_session = result.scalars().first()
 
+    if db_session and db_session.user_id != user_id:
+        log.warning("Rejected cross-user session access: session_id=%s", session_id)
+        raise PermissionError("Session belongs to another user")
+
     if not db_session:
         db_session = Session(session_id=session_id, user_id=user_id, current_task_id=task_id)
         db.add(db_session)
@@ -49,12 +53,19 @@ async def get_or_create_session(db: AsyncSession, session_id: str, user_id: str,
     )
 
 
-async def append_dialog(db: AsyncSession, session_id: str, role: str, content: str) -> None:
+async def append_dialog(
+    db: AsyncSession,
+    session_id: str,
+    role: str,
+    content: str,
+    action_taken: str | None = None,
+) -> None:
     chat_log = ChatLog(
         message_id=str(uuid.uuid4()),
         session_id=session_id,
         role=role,
-        content=content
+        content=content,
+        action_taken=action_taken,
     )
     db.add(chat_log)
     await db.commit()
@@ -66,11 +77,14 @@ async def update_session_context(
     user_id: str,
     current_task_id: str | None = None,
     help_level: int | None = None,
+    clear_current_task: bool = False,
 ) -> WorkingMemory:
     await get_or_create_session(db, session_id, user_id)
 
     values: dict[str, str | int | None] = {}
-    if current_task_id is not None:
+    if clear_current_task:
+        values["current_task_id"] = None
+    elif current_task_id is not None:
         values["current_task_id"] = current_task_id
     if help_level is not None:
         values["help_level"] = min(4, max(1, help_level))

@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { API_V1 } from '../config/api.config';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -13,6 +14,7 @@ export interface ChatRequest {
   message: string;
   extra_context?: string;
   task_id?: string;
+  document_id?: string;
 }
 
 export interface ChatResponse {
@@ -21,6 +23,26 @@ export interface ChatResponse {
   action_taken?: string;
   tool_calls?: string[];
   trace_id?: string;
+  decision: AgentDecision;
+  agent_trace: AgentTraceStep[];
+  agents_involved: string[];
+  reviewed: boolean;
+}
+
+export interface AgentDecision {
+  intent: string;
+  action: string;
+  objective: string;
+  decision_basis: string;
+  tool_names: string[];
+  success_criteria: string[];
+}
+
+export interface AgentTraceStep {
+  agent: 'perception' | 'planner' | 'tutor' | 'reviewer' | 'memory';
+  phase: 'perceive' | 'plan' | 'act' | 'review' | 'remember';
+  summary: string;
+  duration_ms: number;
 }
 
 export interface SessionInfo {
@@ -32,12 +54,13 @@ export interface SessionInfo {
 export interface ChatContextOptions {
   extraContext?: string;
   taskId?: string;
+  documentId?: string;
 }
 
 @Injectable({ providedIn: 'root' })
 export class AgentService {
   private http = inject(HttpClient);
-  private apiUrl = 'http://localhost:8000/api/v1/agent';
+  private apiUrl = `${API_V1}/agent`;
 
   chat(sessionId: string, message: string, options: ChatContextOptions = {}): Observable<ChatResponse> {
     const request: ChatRequest = {
@@ -45,6 +68,7 @@ export class AgentService {
       message,
       extra_context: options.extraContext || undefined,
       task_id: options.taskId || undefined,
+      document_id: options.documentId || undefined,
     };
 
     return this.http.post<ChatResponse>(`${this.apiUrl}/chat`, request);

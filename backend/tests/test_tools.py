@@ -1,6 +1,6 @@
 """
-Tests für die Agent-Tools (Mock-Implementierungen – kein API-Key nötig).
-Semantische Assertions statt exakter Stringvergleiche (Übungsblatt 05).
+Tests für die Agent-Tools ohne Live-API.
+Semantische Assertions statt fragiler exakter Stringvergleiche.
 """
 import pytest
 from app.tools.study_tools import (
@@ -8,8 +8,9 @@ from app.tools.study_tools import (
     _update_learning_profile,
     _generate_quiz_questions,
     _create_cheatsheet,
-    _award_coins,
+    _award_coins_and_exp,
 )
+from app.core.context import current_user_id
 
 
 @pytest.mark.asyncio
@@ -47,7 +48,11 @@ async def test_update_learning_profile_clamps_score():
 
 
 @pytest.mark.asyncio
-async def test_award_coins():
-    result = await _award_coins("user_42", 10, "Aufgabe gelöst")
-    assert result["coins_awarded"] == 10
-    assert result["user_id"] == "user_42"
+async def test_award_requires_authenticated_request_context():
+    token = current_user_id.set("")
+    try:
+        result = await _award_coins_and_exp(10, "Aufgabe gelöst")
+    finally:
+        current_user_id.reset(token)
+    assert "error" in result
+    assert "user_id" in result["error"]

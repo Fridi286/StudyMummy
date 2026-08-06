@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { API_V1 } from '../config/api.config';
 import { UserPublic } from './social.service';
 
 export interface TradeItemCreate {
@@ -43,7 +44,7 @@ export interface TradeResponse {
 })
 export class TradeService {
   private http = inject(HttpClient);
-  private apiUrl = 'http://localhost:8000/api/v1/economy/trades';
+  private apiUrl = `${API_V1}/economy/trades`;
 
   createTrade(trade: TradeCreate): Observable<TradeResponse> {
     return this.http.post<TradeResponse>(this.apiUrl, trade);

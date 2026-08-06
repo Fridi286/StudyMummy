@@ -1,5 +1,5 @@
 """
-Semantic evaluation helpers for Termin 5.
+Semantic evaluation helpers for repeatable agent-quality checks.
 
 The functions are deterministic and intentionally small: they let us evaluate
 mocked or recorded agent runs without depending on a live LLM.

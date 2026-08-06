@@ -1,9 +1,8 @@
 """
 StudyMummy Agent-Tools.
 
-Jedes Tool ist eine async-Funktion mit klarer Signatur.
-Mock-Implementierungen können durch echte Services ersetzt werden
-(Hinweis Übungsblatt 03: „Fangt mit Mock-Tools an!").
+Jedes Tool ist eine async-Funktion mit klarer Signatur. Tools werden zentral
+registriert und ausschließlich innerhalb eines expliziten Capability-Scopes ausgeführt.
 """
 import json
 from datetime import datetime, timezone
@@ -13,13 +12,13 @@ from openai import AsyncOpenAI
 from sqlalchemy import select, update
 
 from app.core.config import get_settings
+from app.core.openai_compat import temperature_kwargs
 from app.db.models import LearningProfile as DbLearningProfile
 from app.db.session import AsyncSessionLocal
 from app.services.session_service import update_profile
 import uuid
 from app.tools.registry import ToolDefinition, register, ToolResult
 from app.core.logging import get_logger
-from app.db.session import AsyncSessionLocal
 from app.db.models import User, ActiveItem, CalendarNote, Task, Document, ChatLog, Session
 from app.core.context import current_user_id
 from app.websockets.manager import manager
@@ -63,8 +62,13 @@ def _fallback_evaluation(user_answer: str, expected_concept: str, help_level: in
     concept = expected_concept.strip().lower()
     has_concept = bool(concept and concept in answer)
     has_substantial_answer = len(answer.split()) >= 4
+    stuck_markers = ("weiss nicht", "weiß nicht", "weiss es nicht", "weiß es nicht", "keine ahnung", "verstehe nicht")
 
-    if has_concept:
+    if any(marker in answer for marker in stuck_markers):
+        verdict = "incorrect"
+        score = 0.0
+        detected_error = "Die Antwort signalisiert, dass der Lösungsansatz noch unklar ist."
+    elif has_concept:
         verdict = "correct"
         score = 1.0
         detected_error = ""
@@ -90,7 +94,7 @@ def _fallback_evaluation(user_answer: str, expected_concept: str, help_level: in
 def _can_evaluate_locally(user_answer: str, expected_concept: str) -> bool:
     answer = user_answer.strip().lower()
     concept = expected_concept.strip().lower()
-    stuck_markers = ("weiss nicht", "weiß nicht", "keine ahnung", "verstehe nicht")
+    stuck_markers = ("weiss nicht", "weiß nicht", "weiss es nicht", "weiß es nicht", "keine ahnung", "verstehe nicht")
     return bool(concept and concept in answer) or len(answer.split()) < 4 or any(marker in answer for marker in stuck_markers)
 
 
@@ -129,7 +133,7 @@ user_answer: {user_answer}
     try:
         response = await client.chat.completions.create(
             model=settings.openai_model,
-            temperature=0.1,
+            **temperature_kwargs(settings.openai_model, 0.1),
             messages=[{"role": "user", "content": prompt}],
             response_format={"type": "json_object"},
         )

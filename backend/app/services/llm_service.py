@@ -14,6 +14,7 @@ from openai.types.chat import (
 
 from app.core.config import get_settings
 from app.core.logging import get_logger, get_trace_id
+from app.core.openai_compat import temperature_kwargs
 from app.models.agent import ExtractedTask
 from app.tools.registry import as_openai_tools, get
 
@@ -126,6 +127,49 @@ class LLMService:
         self.model = settings.openai_model
         self.temperature = settings.openai_temperature
 
+    async def complete_json(
+        self,
+        *,
+        system_prompt: str,
+        payload: dict[str, Any],
+        temperature: float = 0.0,
+    ) -> dict[str, Any] | None:
+        """Run a bounded structured call for a specialist agent.
+
+        Returning ``None`` is intentional: callers own a deterministic fallback so
+        the workflow remains available when a provider cannot produce JSON mode.
+        """
+        trace = get_trace_id()
+        started_at = time.perf_counter()
+        try:
+            response = await self.client.chat.completions.create(
+                model=self.model,
+                **temperature_kwargs(self.model, temperature),
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
+                ],
+                response_format={"type": "json_object"},
+            )
+            content = response.choices[0].message.content or "{}"
+            parsed = json.loads(content)
+            if not isinstance(parsed, dict):
+                raise ValueError("Structured agent response must be a JSON object")
+            log.info(
+                "[%s] Structured agent call completed in %.1fms",
+                trace,
+                (time.perf_counter() - started_at) * 1000,
+            )
+            return parsed
+        except Exception as exc:
+            log.warning(
+                "[%s] Structured agent call failed after %.1fms: %s",
+                trace,
+                (time.perf_counter() - started_at) * 1000,
+                exc,
+            )
+            return None
+
     async def chat_with_tools(
         self,
         messages: list[ChatCompletionMessageParam],
@@ -180,7 +224,7 @@ class LLMService:
                     log.info(f"[{trace}] LLM call with model={self.model!r}, tool_choice='auto'")
                     response = await self.client.chat.completions.create(
                         model=self.model,
-                        temperature=self.temperature,
+                        **temperature_kwargs(self.model, self.temperature),
                         messages=full_messages,
                         tools=tools,
                         tool_choice="auto",
@@ -188,7 +232,7 @@ class LLMService:
                 else:
                     response = await self.client.chat.completions.create(
                         model=self.model,
-                        temperature=self.temperature,
+                        **temperature_kwargs(self.model, self.temperature),
                         messages=full_messages,
                     )
             except Exception as e:
@@ -281,8 +325,8 @@ class LLMService:
                 tool_calls_made,
             )
         return (
-            "Ich kann gerade keine zuverlaessige KI-Antwort erzeugen. "
-            "Bitte versuche es gleich noch einmal oder formuliere die Frage etwas kuerzer.",
+            "Ich kann gerade keine zuverlässige KI-Antwort erzeugen. "
+            "Bitte versuche es gleich noch einmal oder formuliere die Frage etwas kürzer.",
             tool_calls_made,
         )
 
@@ -311,7 +355,7 @@ JSON:"""
         try:
             response = await self.client.chat.completions.create(
                 model=self.model,
-                temperature=0.1,
+                **temperature_kwargs(self.model, 0.1),
                 messages=[{"role": "user", "content": prompt}],
                 response_format={"type": "json_object"},
             )

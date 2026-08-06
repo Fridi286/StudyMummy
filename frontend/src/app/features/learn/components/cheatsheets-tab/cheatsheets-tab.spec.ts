@@ -12,6 +12,7 @@ describe('CheatsheetsTab', () => {
     }).compileComponents();
 
     fixture = TestBed.createComponent(CheatsheetsTab);
+    fixture.componentRef.setInput('cheatsheets', []);
     component = fixture.componentInstance;
     await fixture.whenStable();
   });

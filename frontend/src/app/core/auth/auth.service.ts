@@ -2,6 +2,7 @@ import { Injectable, computed, signal, effect } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { Observable, tap, catchError, throwError } from 'rxjs';
+import { API_ORIGIN, API_V1 } from '../config/api.config';
 
 export interface UserResponse {
   user_id: string;
@@ -59,7 +60,7 @@ export class AuthService {
 
   // Backend is proxied or absolute. Since both run in docker compose on different ports locally:
   // If we access the frontend from localhost:4200, we should point to localhost:8000 for the backend API.
-  private apiUrl = 'http://localhost:8000/api/v1/auth';
+  private apiUrl = `${API_V1}/auth`;
 
   // Trigger to manually force avatar URL recomputation
   private avatarUpdateTrigger = signal<number>(0);
@@ -69,7 +70,7 @@ export class AuthService {
     this.avatarUpdateTrigger(); // register dependency
     const user = this.currentUser();
     if (user && user.avatar_url) {
-      return `http://localhost:8000${user.avatar_url}?v=${Date.now()}`;
+      return `${API_ORIGIN}${user.avatar_url}?v=${Date.now()}`;
     }
     return null;
   });

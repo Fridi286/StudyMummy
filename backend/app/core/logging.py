@@ -1,7 +1,4 @@
-"""
-Strukturiertes Logging für Observability (Übungsblatt 05).
-Jeder Agent-Durchlauf erhält eine trace_id.
-"""
+"""Structured observability; every agent run receives a trace ID."""
 import logging
 import sys
 import uuid

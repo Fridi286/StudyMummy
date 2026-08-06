@@ -210,7 +210,7 @@ async def create_practice_task(
                         "Wenn der Dokumentinhalt Übungsaufgaben enthält, ignoriere deren konkrete Aufgabenstellung, "
                         "Zahlen, Namen und Szenarien. Erzeuge stattdessen eine neue, originale Aufgabe zum selben Themenfeld "
                         "mit neuen Zahlen, neuen Beispielen oder einem neuen Szenario. "
-                        "Die Aufgabe muss vollständig ohne externes Übungsblatt lösbar sein. "
+                        "Die Aufgabe muss vollständig ohne ein externes Quelldokument lösbar sein. "
                         "context_excerpt soll nur die sichtbaren Grundlagen enthalten, die zum Lösen nötig sind "
                         "(Definitionen, Regeln, Formeln, kurze fachliche Erinnerung), aber keine Originalaufgabe. "
                         "Die Frage darf nicht lauten 'beziehe dich auf den Text/das Blatt/die vorige Aufgabe'. "

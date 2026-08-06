@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     openai_timeout_seconds: float = 20.0
     openai_max_retries: int = 0
 
+    # Agent workflow
+    agent_review_enabled: bool = True
+
     # HAW ICC Fallback
     haw_icc_api_key: str | None = None
     haw_icc_base_url: str = "https://llm.inf.haw-hamburg.de/v1"
