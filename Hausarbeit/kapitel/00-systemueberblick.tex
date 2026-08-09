@@ -1,0 +1,24 @@
+\section{Systemüberblick}
+\label{sec:systemueberblick}
+
+StudyMummy ist eine webbasierte Lernplattform, die hochgeladene Lernunterlagen
+in Aufgaben, Quizfragen und Merkblätter überführt und Lernende in einem
+sokratischen Chat adaptiv unterstützt. Analysegegenstand ist der Stand des
+Repositories beim Commit \texttt{fb77caf}. Der agentische Kern verarbeitet pro
+Chat-Turn eine authentifizierte Nachricht zusammen mit Aufgabe,
+Hilfestufe, Dialoghistorie und abgerufenem Dokumentwissen. Ein Planning Agent
+wählt einen begrenzten nächsten Schritt, ein Tutor Agent erzeugt die Antwort
+und darf freigegebene Werkzeuge ausführen, ein Reviewer Agent kontrolliert den
+Entwurf. Die Rollen werden durch einen festen Orchestrator nacheinander
+aufgerufen.
+
+Technisch besteht das System aus einer Angular-22-Single-Page-Application,
+einer asynchronen FastAPI-Anwendung mit Pydantic und SQLAlchemy sowie
+PostgreSQL~15 mit \texttt{pgvector}. Ein OpenAI-kompatibler Adapter stellt
+strukturierte LLM-Aufrufe und Function Calling bereit. Docker Compose trennt
+Entwicklungs- und Produktionsprofile, im Produktivprofil liefert Nginx das
+Frontend aus und leitet API- und WebSocket-Verkehr an das Backend weiter.
+Persistiert werden unter anderem Nutzer, Dokumente, Vektorchunks, Aufgaben,
+Sitzungen, Chatlogs, Lernprofile und Gamification-Zustände. Das Repository ist
+auf dem Deckblatt verlinkt, die folgenden Kapitel analysieren ausschließlich
+die für Agency relevanten Pfade und nicht die gesamte Produktfunktionalität.

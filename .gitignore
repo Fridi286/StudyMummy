@@ -84,8 +84,5 @@ Thumbs.db
 backend/static/avatars/*
 !backend/static/avatars/.gitkeep
 
-# Local paper workspace (never commit)
-/Hausarbeit/
-
 # Generated WebP images (auto-converted from SVG)
 *.webp

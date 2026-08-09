@@ -1,0 +1,74 @@
+\section{Multi-Agent-Entscheidung (Kap. 04)}
+\label{sec:multi-agent}
+
+StudyMummy ist ein \emph{hierarchisch orchestriertes, logisches
+Multi-Agent-System}, nicht jedoch ein verteiltes System autonomer Prozesse.
+Planning, Tutor und Reviewer besitzen getrennte Systemprompts, Ziele und
+Pydantic-Ausgabeverträge. Der Planner bestimmt die nächste Aktion und den
+Capability-Scope, der Tutor ist der einzige ausführende Worker, der Reviewer
+verfolgt das unabhängige Kontrollziel und kann den Antworttext ersetzen. Alle
+drei teilen denselben LLM-Adapter und haben keinen eigenen Prozess oder
+dauerhaften lokalen Speicher. Der \texttt{AgentOrchestrator} ist selbst kein
+LLM-Agent, sondern deterministischer Kontrollcode.
+
+Die Kommunikation erfolgt ausschließlich sequentiell über typisierte Python-
+Objekte: \texttt{AgentContext} $\rightarrow$ \texttt{AgentPlan}
+$\rightarrow$ Tutorentwurf $\rightarrow$ \texttt{AgentReview}. Es gibt weder
+Peer-to-Peer-Nachrichten noch parallele Workers oder dynamische Delegation.
+Session- und RAG-Services liefern gemeinsamen Zustand, nur der Tutor greift auf
+Werkzeuge zu. Damit ähnelt die Architektur dem Orchestrator/Worker-Muster,
+ergänzt um einen Critic, während Perception und Memory Services und keine
+Agenten sind. Die logische Rollentrennung ist gerechtfertigt, weil
+Planerzeugung, Ausführung und Qualitätskontrolle unterschiedliche Rechte und
+Prüfkriterien besitzen. Für weitere Produktfunktionen eigene Agenten zu
+erzeugen wäre dagegen Koordinationsaufwand ohne Autonomiegewinn.
+
+\begin{center}
+\begin{minipage}{\linewidth}
+  \centering
+  \begin{tikzpicture}[
+    >=Latex,
+    box/.style={draw,rounded corners,align=center,minimum height=8mm,text width=27mm,font=\small},
+    role/.style={box,fill=hawblue!8},
+    service/.style={box,fill=gray!10},
+    every path/.style={draw,->,semithick}
+  ]
+    \node[box] (ui) at (-4.8,1.5) {Lernende Person\\Angular};
+    \node[box] (api) at (-1.6,1.5) {FastAPI\\\texttt{/agent/chat}};
+    \node[service] (context) at (2.2,1.5) {Kontextbildung\\Session + RAG};
+    \node[service] (orch) at (0,0) {deterministischer\\Orchestrator};
+    \node[role] (planner) at (-5.0,-1.7) {Planning Agent\\\texttt{AgentPlan}};
+    \node[role] (tutor) at (-1.7,-1.7) {Tutor Agent\\Ausführung};
+    \node[role] (reviewer) at (1.7,-1.7) {Reviewer Agent\\Freigabe/Revision};
+    \node[service] (memory) at (5.0,-1.7) {Memory Service\\Chatlog};
+    \node[service] (tools) at (-1.7,-3.6) {Tool Registry\\Side Effects};
+    \node[service] (llm) at (1.7,-3.6) {gemeinsamer OpenAI-kompatibler LLM-Adapter};
+    \node[service] (db) at (5.0,-3.6) {PostgreSQL\\+ pgvector};
+
+    \path (ui) edge (api);
+    \path (api) edge (context);
+    \path (context) edge (orch);
+    \path (orch) edge (planner);
+    \path (planner) edge (tutor);
+    \path (tutor) edge (reviewer);
+    \path (reviewer) edge (memory);
+    \path (tutor) edge (tools);
+    \path (memory) edge (db);
+    \draw[->,semithick] (tools.south) -- ++(0,-0.9) -| (db.south);
+    \draw[dashed,->] (llm) -- (planner);
+    \draw[dashed,->] (llm) -- (tutor);
+    \draw[dashed,->] (llm) -- (reviewer);
+  \end{tikzpicture}
+  \captionsetup{hypcap=false}
+  \captionof{figure}{Selbst erstellte logische Multi-Agent-Architektur von StudyMummy, gestrichelt ist der gemeinsam genutzte LLM-Adapter.}
+  \label{fig:mas-architektur}
+\end{minipage}
+\end{center}
+
+\Cref{fig:mas-architektur} macht zugleich die Grenze sichtbar: Der Orchestrator
+kennt die gesamte Ausführungsreihenfolge, die Rollen kommunizieren nicht
+autonom. Präziser als die pauschale Dokumentationsaussage \enquote{MAS} ist
+daher \enquote{rollenbasierte Multi-Agent-Pipeline}. Ein Single-Agent-Entwurf
+wäre kürzer, würde aber Capability-Trennung und unabhängige Review-Schnittstelle
+aufgeben, drei unabhängige Services oder Modelle wären für den linearen
+Turn-Workflow unnötig teuer.

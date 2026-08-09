@@ -1,0 +1,57 @@
+\section{Safety-Analyse (Kap. 06)}
+\label{sec:safety}
+
+\subsection{Angriffsvektoren und Guardrails}
+
+\textbf{Indirekte Prompt-Injection aus Lernmaterialien.} Ein Angreifer kann in
+einem hochgeladenen PDF Anweisungen platzieren, die beim semantischen Abruf in
+den Tutor-Prompt gelangen. Genau diese Vermischung von Daten und Instruktionen
+ermöglicht indirekte Prompt-Injection bis hin zur Manipulation nachgelagerter
+API-Aufrufe \parencite{greshakeEtAl2023}. StudyMummy filtert einige direkte
+Muster in Nutzernachrichten, isoliert RAG nach Nutzer und Dokument und markiert
+Dokumenttext im Systemprompt als nicht vertrauenswürdig. Der Reviewer soll
+befolgte Dokumentanweisungen erkennen. Diese Guardrails reduzieren das Risiko,
+sind aber nicht vollständig: Chunks und \texttt{extra\_context} werden nicht
+semantisch geprüft, und Review findet erst nach Toolausführung statt.
+
+Passend wären mehrere Grenzen: Dokumente und Frontend-Kontext immer als
+unvertrauenswürdige, zitierbare Datensätze serialisieren, Retrieval-Ergebnisse
+mit Provenienz versehen, geplante Toolargumente vor Ausführung gegen eine
+deterministische Policy prüfen, Dokumentkontext darf niemals neue Tools oder
+Identitäten bestimmen. Ergänzend sollten Injection-Testkorpora, Rate Limits
+und Quarantäne bei verdächtigen Chunks eingesetzt werden. Ein weiterer
+LLM-Filter allein wäre wegen korrelierter Fehlentscheidungen kein verlässlicher
+Sicherheitsanker.
+
+\textbf{Toolmissbrauch und ungewollte Seiteneffekte.} Direkte Aufforderungen
+könnten Coins erzeugen oder ohne ausreichende Bestätigung Termine anlegen.
+Vorhanden sind aktionsabhängige Toolrechte, eine zweite Scope-Prüfung im
+LLM-Adapter, gebundene Nutzeridentität sowie beim Belohnungstool Betragsgrenze,
+Eigentumsprüfung, Zeilensperre und Doppelbelohnungsschutz. Die einfache Suche
+nach Wörtern wie \enquote{coin} ist umgehbar und kann legitime Nachrichten
+blockieren. Beim Kalender fehlen Nutzerbestätigung, Idempotenzschlüssel und die
+fachliche Prüfung, dass Ende nach Beginn liegt. Da der Reviewer erst nach der
+Ausführung arbeitet, kann er diese Wirkung nicht verhindern.
+
+Ein Pre-Execution-Monitor sollte daher Tool, Argumente, Identität,
+Wertebereiche und erwartete Aktion prüfen. Schreibende Aufrufe werden zunächst
+als \texttt{pending} protokolliert, Kalendertermine werden erst nach
+Bestätigung committet. Für Belohnungen reichen wegen geringer Reversibilität
+enge automatisierte Grenzen und Auditlog. Verbleibende Risiken sind
+LLM-Nichtdeterminismus, Promptvarianten außerhalb der Filter, vergiftetes
+Langzeitgedächtnis, Kostenmissbrauch durch große Uploads sowie personenbezogene
+Inhalte in Logs und Vektorspeicher.
+
+\subsection{Human-in-the-Loop}
+
+Vollständige Freigabe jedes Tutor-Turns würde die Lerninteraktion unbrauchbar
+verlangsamen. Geeignet ist ein risikobasiertes Human-in-the-Loop: Lesen,
+Retrieval, Antwortbewertung und Textentwürfe laufen autonom, ein sichtbarer
+Bestätigungsdialog zeigt bei persistenten Seiteneffekten Toolname, Argumente,
+Quelle und erwartete Wirkung. Die lernende Person bestätigt Kalendertermine
+und kann gespeicherte Erinnerungen löschen. Lehrende oder Betreiber prüfen
+stichprobenartig abgelehnte Antworten und Injection-Traces. HITL begrenzt den
+Schadensradius, ersetzt aber weder Rechteprüfung noch Monitoring: Menschen
+können unter Zeitdruck routinemäßig bestätigen und sehen versteckte
+Kontextmanipulation nicht. Deshalb muss die technische Policy auch bei
+menschlicher Freigabe unverändert gelten.

@@ -1,0 +1,65 @@
+\section{Engineering und Testing (Kap. 05)}
+\label{sec:engineering-testing}
+
+\subsection{Framework- und Implementierungsentscheidungen}
+
+Statt eines Agentenframeworks wie LangGraph implementiert StudyMummy den festen
+Workflow mit kleinen asynchronen Python-Klassen. Für drei lineare Rollen ist
+dies nachvollziehbar: Kontrollfluss, Fehlerpfade und Toolrechte bleiben direkt
+im Code sichtbar, zusätzliche Laufzeitabstraktion entfällt. Pydantic-Modelle
+bilden Verträge für Kontext, Plan, Review und API-Antwort, FastAPI integriert
+Authentifizierung und Dependency Injection, SQLAlchemy kapselt persistente
+Zustände. Der Preis der Eigenimplementierung ist ebenfalls im Code sichtbar:
+Checkpoints, Replanning, Zustandsgraph und Transaktionsgrenzen über mehrere
+Agentenschritte müssen manuell gebaut werden.
+
+Der OpenAI-kompatible Adapter isoliert Providerunterschiede, setzt Timeouts und
+liefert deterministische Fallbacks für strukturelle Agentenaufrufe. Die Tool
+Registry trennt JSON-Schema von Implementierung, die zusätzliche
+\texttt{SAFE\_TOOL\_POLICY} folgt dem Least-Privilege-Prinzip. Trace-IDs im
+Logging-Middleware und Phasenlaufzeiten unterstützen Beobachtbarkeit, wobei
+kein externes Trace-Backend oder persistenter vollständiger Agentenlauf
+implementiert ist. Angular und REST halten UI und Agentenlogik getrennt,
+Docker Compose reproduziert PostgreSQL/pgvector, Backend und Frontend.
+
+\subsection{Testfaelle und Beobachtungen}
+
+Am 6.~August~2026 wurde im vorhandenen Backend-Virtualenv ein Pytest-Lauf mit
+den Optionen \texttt{-q -p no:cacheprovider} ausgeführt. Ergebnis: 37 Tests
+bestanden in 10,68~s, beobachtet wurde eine
+\texttt{StarletteDeprecation\allowbreak{}Warning}. Es erfolgte kein
+Live-LLM-Aufruf.
+
+\begin{table}[htbp]
+  \centering
+  \footnotesize
+  \begin{tabularx}{\linewidth}{@{}p{0.27\linewidth}XX@{}}
+    \toprule
+    Testfall & Prüfkriterium & Beobachtung \\
+    \midrule
+    Capability-Policy & Ein modellseitiger Plan fordert
+    \texttt{evaluate\_answer}, Kalender- und unbekanntes Tool. Erlaubt bleiben
+    muss nur die zum Aktionstyp passende Schnittstelle. & Test bestanden,
+    Ergebnisliste enthielt ausschließlich \texttt{evaluate\_answer}. \\
+    Reviewer-Revision & Unsicherer Entwurf enthält sofort die vollständige
+    Lösung. Semantische Assertion: Die ausgelieferte Revision beginnt mit einer
+    aktivierenden Zusammenhangsfrage und der Trace meldet Überarbeitung. & Test
+    bestanden, der Entwurf wurde ersetzt. \\
+    Semantische Laufbewertung & Eine Antwort muss nicht wortgleich sein, aber
+    eine Frage oder Führung enthalten, direkte Lösungsmuster vermeiden,
+    erwartete Tools abdecken und eine achtstellige Trace-ID besitzen. & Test
+    bestanden, das regelbasierte Urteil war \texttt{socratic\_stable}. \\
+    \bottomrule
+  \end{tabularx}
+  \caption{Ausgewählte, tatsächlich ausgeführte Backend-Tests.}
+  \label{tab:tests}
+\end{table}
+
+Zwei zusätzliche Beobachtungen begrenzen die Aussagekraft. Das semantische
+Experimentierskript des Backends brach vor einer Ergebnistabelle mit
+\texttt{AttributeError} ab, weil der simulierte Tool Call kein Feld
+\texttt{type} besitzt. Frontend-Tests wurden nicht ausgeführt: Angular verlangt
+Node~22.22.3, 24.15.0 oder 26, verfügbar waren 24.11.0 und 24.14.0. Deshalb
+werden weder Ergebnisse dieses Experiments noch Frontend-Erfolgszahlen
+behauptet. Die bestandenen Tests decken vor allem Verträge und Fallbacks mit
+Mocks ab, nicht fachliche Tutorqualität oder realen Mehrsitzungs-Lernerfolg.

@@ -1,0 +1,59 @@
+\section{LLM, RAG und Tool Use (Kap. 03)}
+\label{sec:llm-rag-tool-use}
+
+\subsection{LLM- und RAG-Entscheidung}
+
+Der tatsächliche Produktivwert ist aus dem Repository nicht feststellbar, weil
+\texttt{OPENAI\_MODEL} die Konfiguration überschreibt. Der Code-Default lautet
+\texttt{gpt-4o-mini}, alternativ kann ein OpenAI-kompatibler HAW-Endpunkt
+verwendet werden. Für den Lernchat ist diese Wahl plausibel als Kosten- und
+Latenzkompromiss, weil pro Turn bis zu drei strukturierte Rollenaufrufe plus
+Toolrunden entstehen. Benötigt werden JSON-Modus und Function Calling, nicht
+maximale Modellgröße. Modellabhängige Kompatibilität ist sichtbar: Bei Namen
+mit \texttt{qwen} werden Tools deaktiviert, Reasoning-Modelle erhalten keinen
+Temperaturparameter. Ein empirischer Qualitätsvergleich verschiedener Modelle
+fehlt, daher ist die Modellwahl konfigurierbar, aber nicht evaluiert begründet.
+
+RAG ist dagegen fachlich notwendig, weil private Lernmaterialien weder sicher
+im Modellwissen liegen noch vollständig in jeden Prompt passen. Lewis et al.
+beschreiben die Verbindung parametrischen Modellwissens mit explizitem,
+nichtparametrischem Speicher \parencite{lewisEtAl2020rag}. StudyMummy indexiert
+Dokumentchunks mit dem konfigurierten Embedding-Modell (Default
+\texttt{text-embedding-3-small}) in \texttt{pgvector} und lädt pro Frage die
+drei ähnlichsten, nutzerisolierten Chunks. Der Nutzen ist projektspezifische
+Grundierung. Grenzen sind starres Zeichen-Chunking, fehlende
+Ähnlichkeitsschwelle und Quellenangabe, kein Reranking und stilles Degradieren
+bei Fehlern.
+
+\subsection{Tools und Agentic Pattern}
+
+Die Registry enthält sechs Werkzeuge. \Cref{lst:tools} zeigt deren tatsächliche
+Python-Signaturen, nur die erste Gruppe liegt im effektiven Chat-Scope.
+
+\begin{lstlisting}[language=Python,float=htbp,caption={Registrierte Werkzeugsignaturen und effektiver Chat-Scope.},label={lst:tools}]
+# vom Chat-Workflow freigebbar
+evaluate_answer(task_id: str, user_answer: str,
+                expected_concept: str, help_level: int = 1) -> dict
+award_coins_and_exp(amount: int, reason: str,
+                    task_id: str | None = None) -> dict
+add_calendar_note(title: str, content: str,
+                  start_time: str, end_time: str) -> dict
+
+# registriert, aber durch SAFE_TOOL_POLICY im Chat nie erreichbar
+update_learning_profile(user_id: str, tag: str, score: float,
+                        error_pattern: str = "") -> dict
+generate_quiz_questions(topic: str, num_questions: int = 5,
+                        difficulty: int = 2) -> dict
+create_cheatsheet(user_id: str, session_id: str,
+                  topics: list[str]) -> dict
+\end{lstlisting}
+
+Das Muster ist kein unverändertes Chain-of-Thought und auch kein vollständiges
+ReAct. Nach außen sichtbar ist \emph{Plan--Act--Review}: strukturierte
+Ein-Schritt-Planung, eine begrenzte Function-Calling-Schleife mit
+Toolbeobachtungen und unabhängige Textprüfung. Diese Ausführung ist
+\emph{ReAct-ähnlich}, weil der Tutor Aktionen und Beobachtungen alterniert
+\parencite{yaoEtAl2023react}, die übergeordnete Planung wird jedoch nicht anhand
+der Beobachtung aktualisiert. Interne Gedankengänge werden zu Recht nicht im
+Trace veröffentlicht, sondern nur Ziel, Entscheidungsbasis, Aktion und
+Werkzeugnamen.

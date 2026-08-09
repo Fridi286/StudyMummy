@@ -1,0 +1,140 @@
+% !TeX program = lualatex
+% !BIB program = biber
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[a4paper,margin=2.5cm]{geometry}
+\usepackage{fontspec}
+\IfFontExistsTF{Times New Roman}{
+  \setmainfont{Times New Roman}
+}{
+  \setmainfont{TeX Gyre Termes}
+}
+\setmonofont{TeX Gyre Cursor}
+
+\usepackage[ngerman]{babel}
+\usepackage{csquotes}
+\usepackage{setspace}
+\onehalfspacing
+\usepackage{microtype}
+\usepackage{graphicx}
+\graphicspath{{abbildungen/}}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage[font=small,labelfont=bf]{caption}
+\usepackage{fancyhdr}
+\usepackage{hyperref}
+\usepackage[nameinlink,noabbrev]{cleveref}
+\crefname{figure}{Abbildung}{Abbildungen}
+\Crefname{figure}{Abbildung}{Abbildungen}
+\crefname{table}{Tabelle}{Tabellen}
+\Crefname{table}{Tabelle}{Tabellen}
+\crefname{lstlisting}{Listing}{Listings}
+\Crefname{lstlisting}{Listing}{Listings}
+\usepackage[
+  backend=biber,
+  style=authoryear,
+  sorting=nyt,
+  maxcitenames=2,
+  maxbibnames=99
+]{biblatex}
+\addbibresource{literatur.bib}
+
+\input{konfiguration/metadaten}
+
+% Die Aufgabenstellung verlangt 10 pt fuer Fussnoten.
+\renewcommand{\footnotesize}{\fontsize{10pt}{12pt}\selectfont}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.6em}
+\setlength{\emergencystretch}{1.5em}
+\setlist{itemsep=0.25em,topsep=0.4em}
+\setcounter{secnumdepth}{3}
+\setcounter{tocdepth}{2}
+
+\definecolor{hawblue}{HTML}{005AA9}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=black,
+  citecolor=hawblue,
+  urlcolor=hawblue,
+  pdftitle={\Arbeitstitel},
+  pdfauthor={\Autor}
+}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{WP Agentic AI}
+\fancyhead[R]{\Autor}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\setlength{\headheight}{14pt}
+
+\lstset{
+  basicstyle=\ttfamily\small,
+  numbers=left,
+  numberstyle=\scriptsize\color{gray},
+  frame=single,
+  breaklines=true,
+  columns=fullflexible,
+  captionpos=b,
+  showstringspaces=false
+}
+
+\begin{document}
+
+\hypersetup{pageanchor=false}
+\begin{titlepage}
+  \thispagestyle{empty}
+  \begin{center}
+    {\large Hochschule für Angewandte Wissenschaften Hamburg\par}
+    \vspace{0.4cm}
+    {\large Bachelor Informatik -- Sommersemester 2026\par}
+    \vfill
+    {\Large Hausarbeit im Modul\par}
+    \vspace{0.25cm}
+    {\LARGE\bfseries WP Agentic AI\par}
+    \vspace{0.8cm}
+    {\huge\bfseries \Arbeitstitel\par}
+    \vspace{0.5cm}
+    {\Large Analyse des Praktikumsprojekts \Projektname\par}
+    \vfill
+    \begin{tabular}{@{}ll@{}}
+      Autor: & \Autor \\
+      Matrikelnummer: & \Matrikelnummer \\
+      Dozent: & \Dozent \\
+      Praktikumsgruppe: & \Praktikumsgruppe \\
+      Projekt: & \Projektname \\
+      GitHub-Repository: & \href{\RepositoryURL}{\RepositoryAnzeige} \\
+      Vertiefungskapitel: & Kap. 02 -- Kognitive Architektur \\
+      Abgabedatum: & \Abgabedatum
+    \end{tabular}
+    \vfill
+  \end{center}
+\end{titlepage}
+
+% Arabische Nummerierung beginnt auf der ersten Seite nach dem Deckblatt.
+\clearpage
+\hypersetup{pageanchor=true}
+\pagenumbering{arabic}
+\setcounter{page}{1}
+\tableofcontents
+
+\clearpage
+\setcounter{section}{-1}
+\input{kapitel/00-systemueberblick}
+\input{kapitel/01-agent-analyse}
+\input{kapitel/02-kognitive-architektur}
+\input{kapitel/03-llm-rag-tool-use}
+\input{kapitel/04-multi-agent-entscheidung}
+\input{kapitel/05-engineering-testing}
+\input{kapitel/06-safety-analyse}
+\input{kapitel/07-ki-nutzung}
+
+\clearpage
+\printbibliography[heading=bibintoc,title={Literaturverzeichnis}]
+
+\end{document}
