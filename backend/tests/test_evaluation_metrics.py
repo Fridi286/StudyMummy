@@ -1,5 +1,5 @@
 from app.evaluation.metrics import ChatRun, compare_trace_runs, evaluate_chat_run
-from scripts.run_semantic_experiment import study_mummy_react_run
+from scripts.run_semantic_experiment import study_mummy_mas_run, study_mummy_react_run
 
 import pytest
 
@@ -79,3 +79,13 @@ async def test_semantic_experiment_uses_openai_compatible_function_tool_call():
 
     assert run.response_text.endswith("?")
     assert run.tool_calls == ("evaluate_answer",)
+
+
+@pytest.mark.asyncio
+async def test_semantic_experiment_exercises_mas_revision_loop():
+    result = await study_mummy_mas_run()
+
+    assert result.agents_involved == ["planner", "tutor", "reviewer"]
+    assert result.coordination_rounds == 2
+    assert result.response.endswith("?")
+    assert any(item.kind.value == "revision_request" for item in result.communications)

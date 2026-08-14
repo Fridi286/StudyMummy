@@ -1,14 +1,14 @@
-import { Component, signal, effect, inject, OnInit, HostListener, viewChild } from '@angular/core';
+import { Component, signal, computed, effect, inject, OnInit, HostListener, viewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MessageService, ConfirmationService } from 'primeng/api';
 import { ToastModule } from 'primeng/toast';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
-import { MenuModule } from 'primeng/menu';
 import { MenuItem } from 'primeng/api';
 import { ChatService } from '../../core/services/chat.service';
 import { DocumentsService, TaskResponse, TaskStatus, QuizResponse, CheatsheetResponse, DocumentResponse, QuizAttemptResponse } from '../../core/services/documents.service';
 import { SoundService } from '../../core/services/sound.service';
 import { finalize } from 'rxjs/operators';
+import { forkJoin } from 'rxjs';
 import confetti from 'canvas-confetti';
 
 import { EditTagsDialog } from '../../shared/components/edit-tags-dialog/edit-tags-dialog';
@@ -19,11 +19,12 @@ import { StudySidebar } from './components/study-sidebar/study-sidebar';
 import { QuizTab } from './components/quiz-tab/quiz-tab';
 import { TasksTab } from './components/tasks-tab/tasks-tab';
 import { CheatsheetsTab } from './components/cheatsheets-tab/cheatsheets-tab';
+import { ActionMenuComponent } from '../../shared/components/action-menu/action-menu';
 
 @Component({
   selector: 'app-learn',
   standalone: true,
-  imports: [CommonModule, ToastModule, ConfirmDialogModule, MenuModule, EditTagsDialog, StudySidebar, QuizTab, TasksTab, CheatsheetsTab, AiChatComponent],
+  imports: [CommonModule, ToastModule, ConfirmDialogModule, EditTagsDialog, StudySidebar, QuizTab, TasksTab, CheatsheetsTab, AiChatComponent, ActionMenuComponent],
   templateUrl: './learn.html',
   styleUrl: './learn.css',
   providers: [ConfirmationService]
@@ -63,6 +64,16 @@ export class Learn implements OnInit {
   generatedTasks = signal<TaskResponse[]>([]);
   generatedQuizzes = signal<QuizResponse[]>([]);
   generatedCheatsheets = signal<CheatsheetResponse[]>([]);
+  artifactsLoaded = signal(false);
+  artifactLoadError = signal<string | null>(null);
+  hasNoGeneratedArtifacts = computed(() =>
+    this.artifactsLoaded() &&
+    !this.isAnalyzing() &&
+    !this.artifactLoadError() &&
+    this.generatedTasks().length === 0 &&
+    this.generatedQuizzes().length === 0 &&
+    this.generatedCheatsheets().length === 0
+  );
 
   // Interactive Quiz State
   selectedAnswers = signal<Record<string, Record<string, string>>>({}); // quizId -> (questionId -> option)
@@ -233,8 +244,11 @@ export class Learn implements OnInit {
 
       this.documentsService.uploadDocument(file).subscribe({
         next: (doc) => {
-          // Document uploaded successfully, the backend background task is now running.
-          // We wait for the WebSocket event to trigger `fetchGeneratedArtifacts`.
+          this.documents.update(documents => [
+            doc,
+            ...documents.filter(item => item.document_id !== doc.document_id)
+          ]);
+          this.selectDocument(doc);
         },
         error: (err) => {
           this.isAnalyzing.set(false);
@@ -252,42 +266,70 @@ export class Learn implements OnInit {
   }
 
   private fetchGeneratedArtifacts(documentId: string) {
-    this.documentsService.getDocumentTasks(documentId).subscribe(tasks => {
-      const statusOrder: Record<TaskStatus, number> = {
-        open: 0,
-        in_progress: 1,
-        repeat: 2,
-        solved: 3
-      };
-      const sorted = [...tasks].sort((a, b) => {
-        return statusOrder[a.status] - statusOrder[b.status];
-      });
-      this.generatedTasks.set(sorted);
-    });
+    this.artifactsLoaded.set(false);
+    this.artifactLoadError.set(null);
+    forkJoin({
+      tasks: this.documentsService.getDocumentTasks(documentId),
+      quizzes: this.documentsService.getDocumentQuizzes(documentId),
+      cheatsheets: this.documentsService.getDocumentCheatsheets(documentId),
+    }).subscribe({
+      next: ({ tasks, quizzes, cheatsheets }) => {
+        const statusOrder: Record<TaskStatus, number> = {
+          open: 0,
+          in_progress: 1,
+          repeat: 2,
+          solved: 3
+        };
+        this.generatedTasks.set([...tasks].sort((a, b) => statusOrder[a.status] - statusOrder[b.status]));
+        this.generatedQuizzes.set(quizzes);
+        this.generatedCheatsheets.set(cheatsheets);
+        this.artifactsLoaded.set(true);
 
-    this.documentsService.getDocumentQuizzes(documentId).subscribe(quizzes => {
-      this.generatedQuizzes.set(quizzes);
-
-      // Fetch past attempts for each quiz
-      quizzes.forEach(quiz => {
-        this.documentsService.getQuizAttempts(quiz.quiz_id).subscribe(attempts => {
-          this.quizAttempts.update(prev => ({
-            ...prev,
-            [quiz.quiz_id]: attempts
-          }));
-
-          // Clear selected answers when loading new attempts to start fresh
-          this.selectedAnswers.update(prev => {
-            const newAnswers = { ...prev };
-            newAnswers[quiz.quiz_id] = {};
-            return newAnswers;
+        quizzes.forEach(quiz => {
+          this.documentsService.getQuizAttempts(quiz.quiz_id).subscribe({
+            next: attempts => {
+              this.quizAttempts.update(prev => ({ ...prev, [quiz.quiz_id]: attempts }));
+              this.selectedAnswers.update(prev => ({ ...prev, [quiz.quiz_id]: {} }));
+            },
+            error: () => this.messageService.add({
+              severity: 'warn',
+              summary: 'Quiz History Unavailable',
+              detail: 'The quiz is available, but previous attempts could not be loaded.'
+            })
           });
         });
-      });
+      },
+      error: (err) => {
+        const message = err.error?.detail || 'Generated learning materials could not be loaded.';
+        this.artifactLoadError.set(message);
+        this.artifactsLoaded.set(true);
+        this.messageService.add({ severity: 'error', summary: 'Loading Failed', detail: message });
+      }
     });
+  }
 
-    this.documentsService.getDocumentCheatsheets(documentId).subscribe(cheatsheets => {
-      this.generatedCheatsheets.set(cheatsheets);
+  reanalyzeActiveDocument() {
+    const document = this.activeDocument();
+    if (!document || this.isAnalyzing()) return;
+
+    this.isAnalyzing.set(true);
+    this.artifactsLoaded.set(false);
+    this.documentsService.reanalyzeDocument(document.document_id).subscribe({
+      next: () => this.messageService.add({
+        severity: 'info',
+        summary: 'Analysis Restarted',
+        detail: 'Tasks, quiz and cheatsheet are being generated. This may take a minute.',
+        sticky: true,
+      }),
+      error: (err) => {
+        this.isAnalyzing.set(false);
+        this.artifactsLoaded.set(true);
+        this.messageService.add({
+          severity: 'error',
+          summary: 'Analysis Could Not Start',
+          detail: err.error?.detail || 'Please try uploading the document again.'
+        });
+      }
     });
   }
 

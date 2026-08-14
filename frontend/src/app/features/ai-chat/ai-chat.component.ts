@@ -136,6 +136,15 @@ export class AiChatComponent implements OnInit {
           role: 'assistant',
           content: res.message,
           timestamp: new Date(),
+          masRun: {
+            agents: res.agents_involved,
+            coordinationRounds: res.coordination_rounds,
+            reviewed: res.reviewed,
+            messageKinds: res.communications.map(message => message.kind),
+            toolOutcomes: res.tool_observations.map(
+              observation => `${observation.tool_name}: ${observation.status}`,
+            ),
+          },
         }]);
         this.isLoading.set(false);
         this.scrollToBottom();

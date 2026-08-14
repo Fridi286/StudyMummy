@@ -67,6 +67,8 @@
       <!-- 3 dots menu -->
       <div class="relative pr-2 flex items-center">
         <button (click)="openMenu($event, menu, doc); $event.stopPropagation()"
+          data-testid="document-actions"
+          aria-label="Document actions"
           class="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-200 hover:text-slate-700 transition-all opacity-0 group-hover:opacity-100 focus:opacity-100">
           <i class="pi pi-ellipsis-v text-xs"></i>
         </button>
@@ -77,5 +79,5 @@
     </div>
   </div>
 
-  <p-menu #menu [popup]="true" [model]="menuItems" appendTo="body" styleClass="w-36 text-sm"></p-menu>
+  <app-action-menu #menu [model]="menuItems" styleClass="w-44" ariaLabel="Document actions"></app-action-menu>
 </div>

@@ -133,6 +133,7 @@ async def analyze_document_background_task(
             
         # Limit text length to prevent massive token usage for now (e.g. max 20,000 chars)
         prompt_text = full_text[:20000]
+        generated_artifact_count = 0
 
         # 1.2 Generate Semantic Tags
         log.info("Generating Semantic Tags...")
@@ -227,6 +228,7 @@ async def analyze_document_background_task(
                         status="open"
                     )
                     db.add(new_task)
+                    generated_artifact_count += 1
         except Exception as e:
             log.error(f"Failed to generate tasks: {e}")
 
@@ -249,6 +251,7 @@ async def analyze_document_background_task(
                     title=quiz_data.title
                 )
                 db.add(new_quiz)
+                generated_artifact_count += 1
                 
                 for q in quiz_data.questions:
                     new_question = QuizQuestion(
@@ -285,6 +288,7 @@ async def analyze_document_background_task(
                     key_concepts=cheatsheet_data.key_concepts
                 )
                 db.add(new_cheatsheet)
+                generated_artifact_count += 1
         except Exception as e:
             log.error(f"Failed to generate cheatsheet: {e}")
 
@@ -300,6 +304,19 @@ async def analyze_document_background_task(
                 document_id,
                 False,
                 "The document was read, but the generated tasks could not be saved. Please try uploading it again.",
+            )
+            return
+
+        if generated_artifact_count == 0:
+            log.error(
+                "Document %s was readable, but no generated artifacts were produced.",
+                document_id,
+            )
+            await _notify_document_analysis(
+                user_id,
+                document_id,
+                False,
+                "Das Dokument wurde gelesen, aber die KI konnte keine Aufgaben, kein Quiz und kein Merkblatt erzeugen. Bitte prüfe Modell und API-Limit und versuche es erneut.",
             )
             return
 

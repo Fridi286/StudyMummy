@@ -1,13 +1,13 @@
 import { Component, input, output } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { MenuModule } from 'primeng/menu';
 import { MenuItem } from 'primeng/api';
 import { DocumentResponse } from '../../../../core/services/documents.service';
+import { ActionMenuComponent } from '../../../../shared/components/action-menu/action-menu';
 
 @Component({
   selector: 'app-study-sidebar',
   standalone: true,
-  imports: [CommonModule, MenuModule],
+  imports: [CommonModule, ActionMenuComponent],
   templateUrl: './study-sidebar.html',
   styleUrl: './study-sidebar.css'
 })

@@ -2,7 +2,7 @@
 
 StudyMummy ist eine agentische Lernplattform. Sie verarbeitet eigene Lernmaterialien, führt Lernende adaptiv durch Aufgaben und hält Lernfortschritt, Fehlerbilder und Dokumentwissen über mehrere Sitzungen verfügbar.
 
-Der Chat ist als beobachtbarer Multi-Agent-Workflow umgesetzt: Ein Planning Agent wählt den nächsten Lernschritt, ein Tutor Agent führt ihn mit begrenzten Werkzeugrechten aus und ein Reviewer Agent kontrolliert die Antwort vor der Ausgabe. Alle Schritte werden typisiert und mit einer gemeinsamen Trace-ID protokolliert.
+Der Chat ist als hierarchisches, nachrichtengetriebenes Multi-Agent-System umgesetzt: Planning, Tutor und Reviewer besitzen getrennte Ziele, Capabilities und laufbezogene Zustände. Sie kommunizieren über typisierte Nachrichten; der Reviewer kann freigeben, eine toolfreie Tutorrevision verlangen oder den Planner anhand von Toolbeobachtungen neu planen lassen.
 
 ## Kernfunktionen
 
@@ -20,30 +20,37 @@ Der Chat ist als beobachtbarer Multi-Agent-Workflow umgesetzt: Ein Planning Agen
 ```mermaid
 flowchart LR
     UI["Angular Frontend"] --> API["FastAPI"]
-    API --> P["Perception"]
-    P --> PL["Planning Agent"]
-    PL --> T["Tutor Agent"]
+    API --> P["Perception + RAG"]
+    P --> BUS["MAS Message Bus + Blackboard"]
+    BUS <--> PL["Planning Agent"]
+    BUS <--> T["Tutor Agent"]
+    BUS <--> R["Reviewer Agent"]
+    R -. "revision" .-> T
+    R -. "replanning" .-> PL
     T --> TOOLS["Capability-scoped Tools"]
-    TOOLS --> R["Reviewer Agent"]
-    T --> R
-    R --> M["Memory Update"]
-    M --> DB[("PostgreSQL + pgvector")]
-    R --> API
+    TOOLS --> DB[("PostgreSQL + pgvector")]
+    BUS --> API
+    API --> DB
 ```
 
 Eine detaillierte technische Beschreibung steht in [docs/architecture.md](docs/architecture.md). Die agentischen Eigenschaften und Abgrenzungen werden in [docs/agent-system.md](docs/agent-system.md) erläutert.
 
 ## Agenten-Workflow
 
-Ein Chat-Turn durchläuft fünf explizite Phasen:
+Ein Chat-Turn startet mit fünf expliziten Phasen, kann aber über typisierte
+Kritikpfade in die Ausführung oder Planung zurückspringen:
 
 1. **Perceive:** Eingabe normalisieren, aktive Aufgabe und Dokumentkontext laden.
 2. **Plan:** Absicht, nächste Aktion, Ziel, Erfolgskriterien und benötigte Tools bestimmen.
 3. **Act:** Tutorantwort erzeugen und ausschließlich freigegebene Tools aufrufen.
-4. **Review:** Antwort auf Fachlichkeit, Hilfestufe, Planerfüllung und Tooltreue prüfen.
+4. **Review/Coordinate:** Antwort und Toolbeobachtungen prüfen; freigeben, Revision oder Neuplanung adressieren.
 5. **Remember:** Antwort und ausgeführte Aktion im Sitzungsverlauf speichern.
 
-Die API gibt neben der Tutorantwort auch die Entscheidung und den kompakten Agenten-Trace zurück. Damit bleibt nachvollziehbar, welche Rollen beteiligt waren und welche Aktion ausgeführt wurde, ohne interne Gedankengänge offenzulegen.
+Ein konfigurierbares Limit von eins bis vier Koordinationsrunden verhindert
+Endlosschleifen. Die API gibt neben Tutorantwort und finalem Plan erfolgreiche
+Tools, alle Toolstatus, Agentenschritte, sanitisierten Kommunikations-Trace,
+lokale Agentenzustände und die Rundenzahl zurück. Volle Nachrichten-Payloads und
+interne Gedankengänge werden nicht serialisiert.
 
 ## Technologie
 
@@ -133,6 +140,7 @@ Die wichtigsten Umgebungsvariablen sind in `.env.example` dokumentiert:
 - `DATABASE_URL`
 - `EMBEDDING_MODEL`
 - `AGENT_REVIEW_ENABLED`
+- `AGENT_MAX_COORDINATION_ROUNDS`
 - `SECRET_KEY`
 
 Für produktive Umgebungen müssen ein eigener `SECRET_KEY`, eingeschränkte CORS-Origins und sichere Datenbankzugänge gesetzt werden.

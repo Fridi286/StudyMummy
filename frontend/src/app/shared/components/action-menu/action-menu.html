@@ -1,0 +1,53 @@
+<p-popover #popover appendTo="body" [styleClass]="styleClass()">
+  <nav class="py-1" [attr.aria-label]="ariaLabel()" data-testid="action-menu-content">
+    @for (section of sections(); track $index) {
+      @if ($index > 0) {
+        <div class="my-1 border-t border-slate-100" role="separator"></div>
+      }
+
+      @if (section.label) {
+        <div class="px-3 pb-1 pt-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+          {{ section.label }}
+        </div>
+      }
+
+      @for (item of section.items; track item.id ?? item.label ?? $index) {
+        @if (item.routerLink) {
+          <a
+            [routerLink]="item.disabled ? null : item.routerLink"
+            [queryParams]="item.queryParams"
+            [fragment]="item.fragment"
+            (click)="select($event, item)"
+            class="mx-1 flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-indigo-50 hover:text-indigo-700"
+            [ngClass]="item.styleClass"
+            [class.pointer-events-none]="item.disabled"
+            [class.opacity-50]="item.disabled"
+            [attr.aria-disabled]="item.disabled || null"
+          >
+            @if (item.icon) {
+              <i [class]="item.icon + ' w-4 text-center text-slate-400'"></i>
+            }
+            <span>{{ item.label }}</span>
+          </a>
+        } @else {
+          <button
+            type="button"
+            (click)="select($event, item)"
+            class="mx-1 flex w-[calc(100%_-_0.5rem)] items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-700 transition-colors hover:bg-indigo-50 hover:text-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+            [ngClass]="item.styleClass"
+            [disabled]="item.disabled"
+          >
+            @if (item.icon) {
+              <i [class]="item.icon + ' w-4 text-center text-slate-400'"></i>
+            }
+            @if (item.escape === false) {
+              <span [innerHTML]="item.label"></span>
+            } @else {
+              <span>{{ item.label }}</span>
+            }
+          </button>
+        }
+      }
+    }
+  </nav>
+</p-popover>

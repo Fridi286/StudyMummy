@@ -15,3 +15,16 @@ def temperature_kwargs(model: str, temperature: float) -> dict[str, float]:
     if normalized_model.startswith(_DEFAULT_TEMPERATURE_MODEL_PREFIXES):
         return {}
     return {"temperature": temperature}
+
+
+def tool_calling_kwargs(model: str) -> dict[str, str]:
+    """Return compatibility parameters for Chat Completions tool calls.
+
+    Current GPT-5 reasoning variants reject function tools on the Chat
+    Completions endpoint while their default reasoning effort is active.  The
+    provider explicitly supports the same request with reasoning disabled.
+    """
+    normalized_model = model.strip().casefold()
+    if normalized_model.startswith("gpt-5"):
+        return {"reasoning_effort": "none"}
+    return {}

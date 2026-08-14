@@ -148,6 +148,13 @@ export class DocumentsService {
     return this.http.get<CheatsheetResponse[]>(`${this.apiUrl}/${documentId}/cheatsheets`);
   }
 
+  reanalyzeDocument(documentId: string): Observable<{ document_id: string; message: string }> {
+    return this.http.post<{ document_id: string; message: string }>(
+      `${this.apiUrl}/${documentId}/reanalyze`,
+      {}
+    );
+  }
+
   updateTaskStatus(taskId: string, status: TaskStatus): Observable<TaskResponse> {
     return this.http.put<TaskResponse>(`${this.apiUrl}/tasks/${taskId}/status`, { status });
   }

@@ -14,7 +14,8 @@ from openai.types.chat import (
 
 from app.core.config import get_settings
 from app.core.logging import get_logger, get_trace_id
-from app.core.openai_compat import temperature_kwargs
+from app.core.openai_compat import temperature_kwargs, tool_calling_kwargs
+from app.agents.protocol import ToolConversationResult, ToolObservation, ToolStatus
 from app.models.agent import ExtractedTask
 from app.tools.registry import as_openai_tools, get
 
@@ -181,7 +182,7 @@ class LLMService:
         system_prompt: str = SOCRATIC_SYSTEM_PROMPT,
         extra_context: str | None = None,
         allowed_tool_names: Iterable[str] | None = None,
-    ) -> tuple[str, list[str]]:
+    ) -> ToolConversationResult:
         """
         Run one or more LLM calls with optional tool use.
         """
@@ -220,7 +221,7 @@ class LLMService:
 
         tools = as_openai_tools(allowed_tool_names)
         supports_tools = "qwen" not in self.model.lower()
-        tool_calls_made: list[str] = []
+        observations: list[ToolObservation] = []
 
         for _ in range(5):
             call_started_at = time.perf_counter()
@@ -230,6 +231,7 @@ class LLMService:
                     response = await self.client.chat.completions.create(
                         model=self.model,
                         **temperature_kwargs(self.model, self.temperature),
+                        **tool_calling_kwargs(self.model),
                         messages=full_messages,
                         tools=tools,
                         tool_choice="auto",
@@ -241,7 +243,7 @@ class LLMService:
                         messages=full_messages,
                     )
             except Exception as e:
-                return self._llm_error_response(e, trace, started_at, tool_calls_made)
+                return self._llm_error_response(e, trace, started_at, observations)
 
             choice = response.choices[0]
             assistant_msg = choice.message
@@ -260,9 +262,12 @@ class LLMService:
                 duration_ms = round((time.perf_counter() - started_at) * 1000, 1)
                 log.info(
                     f"[{trace}] LLM finished after {duration_ms}ms, "
-                    f"tools_called={tool_calls_made}, final_preview={response_preview!r}"
+                    f"tools_called={[item.tool_name for item in observations]}, final_preview={response_preview!r}"
                 )
-                return assistant_msg.content or "", tool_calls_made
+                return ToolConversationResult(
+                    response=assistant_msg.content or "",
+                    observations=observations,
+                )
 
             for tc in assistant_msg.tool_calls:
                 if tc.type != "function":
@@ -271,6 +276,11 @@ class LLMService:
                 fn_name = tc.function.name
                 if allowed_tool_set is not None and fn_name not in allowed_tool_set:
                     log.warning(f"[{trace}] Blocked disallowed tool call: {fn_name}")
+                    observations.append(ToolObservation(
+                        tool_name=fn_name,
+                        status=ToolStatus.BLOCKED,
+                        result_preview="Tool not allowed in this context.",
+                    ))
                     full_messages.append({
                         "role": "tool",
                         "tool_call_id": tc.id,
@@ -283,6 +293,11 @@ class LLMService:
                 except json.JSONDecodeError as e:
                     result = {"error": f"Invalid tool arguments: {e.msg}"}
                     log.error(f"[{trace}] Tool argument JSON error for {fn_name}: {e}")
+                    observations.append(ToolObservation(
+                        tool_name=fn_name,
+                        status=ToolStatus.INVALID_ARGUMENTS,
+                        result_preview=str(result["error"]),
+                    ))
                     full_messages.append({
                         "role": "tool",
                         "tool_call_id": tc.id,
@@ -295,12 +310,26 @@ class LLMService:
                 try:
                     tool_def = get(fn_name)
                     result = await tool_def.fn(**fn_args)
-                    tool_calls_made.append(fn_name)
+                    status = (
+                        ToolStatus.FAILED
+                        if isinstance(result, dict) and (
+                            "error" in result or result.get("updated") is False
+                        )
+                        else ToolStatus.SUCCEEDED
+                    )
                 except KeyError as e:
                     result = {"error": str(e)}
+                    status = ToolStatus.FAILED
                 except Exception as e:
                     log.error(f"[{trace}] Tool error: {e}")
                     result = {"error": str(e)}
+                    status = ToolStatus.FAILED
+
+                observations.append(ToolObservation(
+                    tool_name=fn_name,
+                    status=status,
+                    result_preview=_preview(json.dumps(result, ensure_ascii=False), max_chars=500),
+                ))
 
                 full_messages.append({
                     "role": "tool",
@@ -310,29 +339,36 @@ class LLMService:
 
         duration_ms = round((time.perf_counter() - started_at) * 1000, 1)
         log.warning(f"[{trace}] LLM max steps reached after {duration_ms}ms")
-        return "Maximale Schrittanzahl erreicht.", tool_calls_made
+        return ToolConversationResult(
+            response="Maximale Schrittanzahl erreicht.",
+            observations=observations,
+        )
 
     def _llm_error_response(
         self,
         error: Exception,
         trace: str,
         started_at: float,
-        tool_calls_made: list[str],
-    ) -> tuple[str, list[str]]:
+        observations: list[ToolObservation],
+    ) -> ToolConversationResult:
         duration_ms = round((time.perf_counter() - started_at) * 1000, 1)
         log.error(f"[{trace}] LLM API error after {duration_ms}ms: {error}")
         error_text = str(error)
         if "Model Group" in error_text or "litellm" in error_text.lower():
-            return (
-                "Der HAW-LLM-Endpunkt ist gerade nicht verfuegbar oder das Modell "
-                f"{self.model!r} ist dort momentan nicht erreichbar. Bitte pruefe eduVPN "
-                "und versuche es gleich erneut.",
-                tool_calls_made,
+            return ToolConversationResult(
+                response=(
+                    "Der HAW-LLM-Endpunkt ist gerade nicht verfuegbar oder das Modell "
+                    f"{self.model!r} ist dort momentan nicht erreichbar. Bitte pruefe eduVPN "
+                    "und versuche es gleich erneut."
+                ),
+                observations=observations,
             )
-        return (
-            "Ich kann gerade keine zuverlässige KI-Antwort erzeugen. "
-            "Bitte versuche es gleich noch einmal oder formuliere die Frage etwas kürzer.",
-            tool_calls_made,
+        return ToolConversationResult(
+            response=(
+                "Ich kann gerade keine zuverlässige KI-Antwort erzeugen. "
+                "Bitte versuche es gleich noch einmal oder formuliere die Frage etwas kürzer."
+            ),
+            observations=observations,
         )
 
     async def extract_tasks_from_text(self, text: str) -> list[ExtractedTask]:

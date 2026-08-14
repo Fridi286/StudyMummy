@@ -6,20 +6,20 @@ import { AuthService } from '../../auth/auth.service';
 import { SocialService, FriendshipResponse } from '../../services/social.service';
 import { ChatService } from '../../services/chat.service';
 import { ButtonModule } from 'primeng/button';
-import { MenuModule } from 'primeng/menu';
 import { MenuItem } from 'primeng/api';
 import { AvatarModule } from 'primeng/avatar';
 import { BadgeModule } from 'primeng/badge';
 import { PopoverModule } from 'primeng/popover';
 import { AvatarUrlPipe } from '../../../shared/pipes/avatar-url.pipe';
 import { InitialsPipe } from '../../../shared/pipes/initials.pipe';
+import { ActionMenuComponent } from '../../../shared/components/action-menu/action-menu';
 
 @Component({
   selector: 'app-header',
   standalone: true,
   imports: [
-    CommonModule, RouterLink, RouterLinkActive, ButtonModule, MenuModule, AvatarModule, BadgeModule, PopoverModule,
-    AvatarUrlPipe, InitialsPipe
+    CommonModule, RouterLink, RouterLinkActive, ButtonModule, AvatarModule, BadgeModule, PopoverModule,
+    AvatarUrlPipe, InitialsPipe, ActionMenuComponent
   ],
   templateUrl: './header.component.html',
 })

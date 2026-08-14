@@ -27,3 +27,9 @@ def test_production_accepts_non_placeholder_secret_key():
     )
 
     assert settings.app_env == "production"
+
+
+@pytest.mark.parametrize("rounds", [0, 5])
+def test_agent_coordination_rounds_are_bounded(rounds: int):
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None, agent_max_coordination_rounds=rounds)

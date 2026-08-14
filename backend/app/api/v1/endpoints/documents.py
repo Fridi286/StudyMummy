@@ -178,6 +178,46 @@ async def update_document_tags(
     return document
 
 
+@router.post("/{document_id}/reanalyze", status_code=status.HTTP_202_ACCEPTED)
+async def reanalyze_empty_document(
+    document_id: str,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Retry AI generation for a readable document that has no artifacts.
+
+    Reanalysis is deliberately limited to empty documents so an accidental
+    retry cannot duplicate or overwrite already generated study material.
+    """
+    document = await _get_user_document_or_404(document_id, db, current_user)
+    if not os.path.exists(document.storage_path):
+        raise HTTPException(status_code=404, detail="Uploaded file is no longer available.")
+
+    artifact_models = (Task, Quiz, Cheatsheet, DocumentChunk)
+    for artifact_model in artifact_models:
+        existing = await db.execute(
+            select(artifact_model).where(artifact_model.document_id == document_id).limit(1)
+        )
+        if existing.scalars().first() is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Generated study material already exists for this document.",
+            )
+
+    background_tasks.add_task(
+        analyze_document_background_task,
+        document.document_id,
+        document.storage_path,
+        current_user.user_id,
+        ",".join(document.tags or []),
+    )
+    return {
+        "document_id": document.document_id,
+        "message": "Document reanalysis started.",
+    }
+
+
 @router.post("/practice/generate", response_model=PracticeTaskResponse)
 async def generate_practice_task(
     request: PracticeTaskRequest,

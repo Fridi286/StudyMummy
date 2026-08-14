@@ -151,7 +151,7 @@ async def delete_session(
     return {"message": "Session deleted"}
 
 
-@router.post("/chat", response_model=ChatResponse, summary="Sokratischer Tutor-Chat")
+@router.post("/chat", response_model=ChatResponse, summary="Kooperativer MAS-Tutor-Chat")
 async def chat(
     req: ChatRequest,
     rag: Annotated[RAGService, Depends(get_rag_service)],
@@ -159,8 +159,9 @@ async def chat(
     current_user: Annotated[User, Depends(get_current_user)]
 ):
     """
-    Hauptendpunkt: Nutzer schreibt eine Nachricht, der Agent antwortet sokratisch
-    und nutzt bei Bedarf nur das eng erlaubte Tool-Subset für diesen Chat.
+    Hauptendpunkt: Planner, Tutor und Reviewer koordinieren den nächsten
+    sokratischen Lernschritt über typisierte Nachrichten. Toolrechte bleiben
+    auf das eng erlaubte Subset dieses Turns begrenzt.
     """
     try:
         message = filter_user_input(req.message)
@@ -231,17 +232,22 @@ async def chat(
     result.steps.append(AgentStep(
         agent="memory",
         phase="remember",
-        summary="Tutorantwort und ausgeführte Aktion im episodischen Sitzungsverlauf gespeichert.",
+        summary="Finale MAS-Antwort und ausgeführte Aktion im episodischen Sitzungsverlauf gespeichert.",
+        round=result.coordination_rounds,
     ))
     return ChatResponse(
         session_id=req.session_id,
         message=result.response,
         action_taken=result.plan.action.value,
         tool_calls=result.tool_calls,
+        tool_observations=result.tool_observations,
         trace_id=get_trace_id(),
         decision=result.plan,
         agent_trace=result.steps,
+        communications=result.communications,
+        agent_states=result.agent_states,
         agents_involved=result.agents_involved,
+        coordination_rounds=result.coordination_rounds,
         reviewed=result.reviewed,
     )
 

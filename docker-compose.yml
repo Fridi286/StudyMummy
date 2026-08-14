@@ -41,6 +41,8 @@ services:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-studymummy}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
+      - AGENT_REVIEW_ENABLED=${AGENT_REVIEW_ENABLED:-true}
+      - AGENT_MAX_COORDINATION_ROUNDS=${AGENT_MAX_COORDINATION_ROUNDS:-2}
       - HAW_ICC_API_KEY=${HAW_ICC_API_KEY}
       - HAW_ICC_BASE_URL=${HAW_ICC_BASE_URL:-https://llm.inf.haw-hamburg.de/v1}
       - EMBEDDING_MODEL=${EMBEDDING_MODEL:-text-embedding-3-small}
@@ -51,6 +53,8 @@ services:
     volumes:
       # Live code reloading during development
       - ./backend/app:/app/app
+      # Keep uploaded documents and other runtime data across container recreation
+      - ./backend/data:/app/data
       # Persist uploaded avatars across container restarts
       - ./backend/static:/app/static
 
@@ -86,6 +90,8 @@ services:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-studymummy}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
+      - AGENT_REVIEW_ENABLED=${AGENT_REVIEW_ENABLED:-true}
+      - AGENT_MAX_COORDINATION_ROUNDS=${AGENT_MAX_COORDINATION_ROUNDS:-2}
       - HAW_ICC_API_KEY=${HAW_ICC_API_KEY}
       - HAW_ICC_BASE_URL=${HAW_ICC_BASE_URL:-https://llm.inf.haw-hamburg.de/v1}
       - EMBEDDING_MODEL=${EMBEDDING_MODEL:-text-embedding-3-small}
@@ -96,6 +102,8 @@ services:
     volumes:
       # Only persist user-uploaded avatars; item images stay baked into the image
       - backend_static:/app/static/avatars
+      # Persist uploaded documents and generated runtime data
+      - backend_data:/app/data
 
   frontend-prod:
     profiles: [ "prod" ]
@@ -123,3 +131,4 @@ services:
 volumes:
   postgres_data:
   backend_static:
+  backend_data:

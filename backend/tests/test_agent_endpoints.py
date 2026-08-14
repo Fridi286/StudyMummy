@@ -12,7 +12,9 @@ from app.db.models import User
 from app.models.memory import WorkingMemory, LearningProfile
 from app.agents.protocol import (
     AgentAction,
+    AgentId,
     AgentIntent,
+    AgentLocalState,
     AgentPlan,
     AgentRunResult,
     AgentStep,
@@ -93,6 +95,12 @@ def test_chat_endpoint_mocked():
             success_criteria=["Aktivierende Rückfrage"],
         ),
         steps=[AgentStep(agent="planner", phase="plan", summary="Hinweis geplant")],
+        agent_states=[AgentLocalState(
+            agent=AgentId.PLANNER,
+            objective="Einen nächsten Schritt planen.",
+            capabilities=["action_selection"],
+            decisions_made=1,
+        )],
         reviewed=True,
     )
     with patch(
@@ -128,7 +136,9 @@ def test_chat_endpoint_mocked():
     assert len(data["message"]) > 0
     assert "trace_id" in data
     assert data["decision"]["action"] == "give_hint"
-    assert data["agents_involved"] == ["planner", "memory"]
+    assert data["agents_involved"] == ["planner"]
+    assert data["coordination_rounds"] == 1
+    assert data["agent_states"][0]["decisions_made"] == 1
     assert data["reviewed"] is True
     agent_context = run_mock.await_args.args[0]
     assert agent_context.document_id == "doc_1"

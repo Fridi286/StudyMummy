@@ -4,7 +4,7 @@ Alle Werte können über Umgebungsvariablen oder .env überschrieben werden.
 """
 from typing import ClassVar
 from functools import lru_cache
-from pydantic import model_validator
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -33,6 +33,7 @@ class Settings(BaseSettings):
 
     # Agent workflow
     agent_review_enabled: bool = True
+    agent_max_coordination_rounds: int = Field(default=2, ge=1, le=4)
 
     # HAW ICC Fallback
     haw_icc_api_key: str | None = None

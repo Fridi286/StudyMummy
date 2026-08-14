@@ -25,7 +25,7 @@
         </div>
         <div *ngIf="getOtherMember() as other">
           <p-button icon="pi pi-ellipsis-v" [rounded]="true" [text]="true" severity="secondary" (onClick)="chatMenu.toggle($event)"></p-button>
-          <p-menu #chatMenu [popup]="true" [model]="chatMenuItems" appendTo="body"></p-menu>
+          <app-action-menu #chatMenu [model]="chatMenuItems" styleClass="w-52" ariaLabel="Chat actions"></app-action-menu>
         </div>
       </div>
 

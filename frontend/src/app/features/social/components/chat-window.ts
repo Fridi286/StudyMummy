@@ -4,18 +4,18 @@ import { FormsModule } from '@angular/forms';
 import { ButtonModule } from 'primeng/button';
 import { AvatarModule } from 'primeng/avatar';
 import { InputTextModule } from 'primeng/inputtext';
-import { MenuModule } from 'primeng/menu';
 import { MenuItem } from 'primeng/api';
 import { ChatroomResponse, UserPublic, SocialService } from '../../../core/services/social.service';
 import { ChatService } from '../../../core/services/chat.service';
 import { AuthService } from '../../../core/auth/auth.service';
 import { AvatarUrlPipe } from '../../../shared/pipes/avatar-url.pipe';
 import { InitialsPipe } from '../../../shared/pipes/initials.pipe';
+import { ActionMenuComponent } from '../../../shared/components/action-menu/action-menu';
 
 @Component({
   selector: 'app-chat-window',
   standalone: true,
-  imports: [CommonModule, FormsModule, ButtonModule, AvatarModule, InputTextModule, MenuModule, AvatarUrlPipe, InitialsPipe],
+  imports: [CommonModule, FormsModule, ButtonModule, AvatarModule, InputTextModule, AvatarUrlPipe, InitialsPipe, ActionMenuComponent],
   templateUrl: './chat-window.html'
 })
 export class ChatWindowComponent {

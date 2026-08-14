@@ -4,7 +4,13 @@ Request/Response-Modelle für alle Agent-Endpunkte.
 from typing import Annotated, Optional
 from pydantic import BaseModel, Field, StringConstraints
 
-from app.agents.protocol import AgentPlan, AgentStep
+from app.agents.protocol import (
+    AgentCommunication,
+    AgentLocalState,
+    AgentPlan,
+    AgentStep,
+    ToolObservation,
+)
 
 
 class ChatRequest(BaseModel):
@@ -20,10 +26,14 @@ class ChatResponse(BaseModel):
     message: str
     action_taken: Optional[str] = None   # z. B. "hint_given", "task_solved"
     tool_calls: list[str] = Field(default_factory=list)
+    tool_observations: list[ToolObservation] = Field(default_factory=list)
     trace_id: str
     decision: AgentPlan
     agent_trace: list[AgentStep] = Field(default_factory=list)
+    communications: list[AgentCommunication] = Field(default_factory=list)
+    agent_states: list[AgentLocalState] = Field(default_factory=list)
     agents_involved: list[str] = Field(default_factory=list)
+    coordination_rounds: int = 1
     reviewed: bool = False
 
 

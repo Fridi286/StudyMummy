@@ -83,6 +83,36 @@
         <div
           class="flex-1 bg-white/80 backdrop-blur-md rounded-3xl border border-slate-200/60 shadow-xl flex flex-col relative overflow-hidden transition-all duration-500 ease-in-out min-h-0">
 
+          @if (isAnalyzing()) {
+          <div class="flex-1 flex flex-col items-center justify-center text-center p-8">
+            <i class="pi pi-spin pi-spinner text-4xl text-indigo-500 mb-4"></i>
+            <h2 class="text-xl font-extrabold text-slate-800 mb-2">Generating learning materials</h2>
+            <p class="text-sm text-slate-500 max-w-md">Tasks, quiz, cheatsheet and document context are being prepared.</p>
+          </div>
+          } @else if (artifactLoadError()) {
+          <div class="flex-1 flex flex-col items-center justify-center text-center p-8">
+            <i class="pi pi-exclamation-triangle text-4xl text-red-400 mb-4"></i>
+            <h2 class="text-xl font-extrabold text-slate-800 mb-2">Learning materials could not be loaded</h2>
+            <p class="text-sm text-slate-500 max-w-md mb-5">{{ artifactLoadError() }}</p>
+            <button (click)="selectDocument(activeDocument()!)"
+              class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold">
+              Try Again
+            </button>
+          </div>
+          } @else if (hasNoGeneratedArtifacts()) {
+          <div class="flex-1 flex flex-col items-center justify-center text-center p-8">
+            <i class="pi pi-sparkles text-4xl text-amber-400 mb-4"></i>
+            <h2 class="text-xl font-extrabold text-slate-800 mb-2">No generated learning materials</h2>
+            <p class="text-sm text-slate-500 max-w-md mb-5">
+              The earlier analysis may have failed. Start it again to generate tasks, a quiz and a cheatsheet.
+            </p>
+            <button (click)="reanalyzeActiveDocument()" [disabled]="isAnalyzing()"
+              class="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 disabled:bg-amber-300 text-white rounded-xl text-sm font-bold flex items-center gap-2">
+              @if (isAnalyzing()) { <i class="pi pi-spin pi-spinner"></i> Analyzing... }
+              @else { <i class="pi pi-refresh"></i> Analyze Again }
+            </button>
+          </div>
+          } @else {
           @if (activeTab() === 'quiz') {
           <app-quiz-tab class="block w-full h-full min-h-0" [quizzes]="generatedQuizzes()"
             [quizAttempts]="quizAttempts()" [selectedAnswers]="selectedAnswers()"
@@ -102,6 +132,8 @@
           @if (activeTab() === 'cheatsheets') {
           <app-cheatsheets-tab class="block w-full h-full min-h-0" [cheatsheets]="generatedCheatsheets()">
           </app-cheatsheets-tab>
+          }
+
           }
 
         </div>
@@ -145,8 +177,8 @@
                 <i class="pi pi-sparkles text-indigo-500 group-hover:animate-pulse"></i> AI Tutor <i
                   class="pi pi-chevron-down text-xs text-slate-400 font-bold ml-1"></i>
               </button>
-              <p-menu #chatMenu [popup]="true" [model]="chatMenuItems()" appendTo="body"
-                styleClass="w-64 text-sm max-h-96 overflow-y-auto"></p-menu>
+              <app-action-menu #chatMenu [model]="chatMenuItems()" styleClass="w-64 max-h-96 overflow-y-auto"
+                ariaLabel="Recent tutor chats"></app-action-menu>
             </div>
             <button (click)="aiChat.startNewSession()" pTooltip="New Chat" tooltipPosition="left"
               class="text-indigo-500 hover:text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg w-8 h-8 flex items-center justify-center transition-colors cursor-pointer">

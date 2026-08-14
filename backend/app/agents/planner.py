@@ -2,7 +2,20 @@
 
 from typing import Any
 
-from app.agents.protocol import AgentAction, AgentContext, AgentIntent, AgentPlan
+from app.agents.protocol import (
+    AgentAction,
+    AgentContext,
+    AgentId,
+    AgentIntent,
+    AgentLocalState,
+    AgentMessage,
+    AgentPlan,
+    MessageEndpoint,
+    MessageKind,
+    MessagePerformative,
+    ToolObservation,
+)
+from app.agents.runtime import AgentBlackboard, MASAgent
 from app.core.logging import get_logger
 from app.services.llm_service import LLMService
 
@@ -20,6 +33,8 @@ SAFE_TOOL_POLICY: dict[AgentAction, set[str]] = {
 
 PLANNER_PROMPT = """Du bist der Planning Agent von StudyMummy.
 Analysiere den aktuellen Lernzustand und plane exakt die naechste sinnvolle Aktion.
+Wenn Koordinationsfeedback, ein vorheriger Plan oder Toolbeobachtungen vorliegen,
+pruefe sie und ersetze einen ungeeigneten Plan gezielt.
 Du antwortest ausschliesslich als JSON mit diesen Feldern:
 - intent: request_hint, explain_concept, evaluate_answer, solve_task, plan_learning, schedule_event oder general_question
 - action: ask_socratic_question, give_hint, explain, evaluate, create_plan, schedule oder clarify
@@ -33,19 +48,35 @@ Tools sind Vorschlaege; eine Policy reduziert die Rechte anschliessend nochmals.
 """
 
 
-class PlanningAgent:
+class PlanningAgent(MASAgent):
     name = "planner"
+    agent_id = AgentId.PLANNER
+    objective = "Aus dem Lernzustand einen begrenzten, überprüfbaren nächsten Schritt ableiten."
+    capabilities = ("intent_classification", "action_selection", "tool_scoping", "replanning")
 
     def __init__(self, llm: LLMService):
         self.llm = llm
 
-    async def plan(self, context: AgentContext) -> AgentPlan:
+    async def plan(
+        self,
+        context: AgentContext,
+        *,
+        feedback: str = "",
+        previous_plan: AgentPlan | None = None,
+        observations: list[ToolObservation] | None = None,
+    ) -> AgentPlan:
         payload = {
             "message": context.message,
             "help_level": context.help_level,
             "current_task_id": context.current_task_id,
             "task_context": context.task_context,
             "has_document_context": bool(context.rag_context or context.extra_context or context.task_context),
+            "coordination_feedback": feedback or None,
+            "previous_plan": previous_plan.model_dump(mode="json") if previous_plan else None,
+            "tool_observations": [
+                observation.model_dump(mode="json")
+                for observation in (observations or [])
+            ],
         }
         raw = await self.llm.complete_json(
             system_prompt=PLANNER_PROMPT,
@@ -65,6 +96,42 @@ class PlanningAgent:
             plan.tool_names,
         )
         return plan
+
+    async def handle(
+        self,
+        message: AgentMessage,
+        blackboard: AgentBlackboard,
+        state: AgentLocalState,
+    ) -> list[AgentMessage]:
+        if message.kind not in {MessageKind.PLAN_REQUEST, MessageKind.REPLAN_REQUEST}:
+            raise ValueError(f"Planner cannot handle message kind {message.kind}")
+
+        is_replan = message.kind == MessageKind.REPLAN_REQUEST
+        previous_plan = blackboard.plan if is_replan else None
+        plan = await self.plan(
+            blackboard.context,
+            feedback=str(message.payload.get("feedback", "")),
+            previous_plan=previous_plan,
+            observations=blackboard.observations,
+        )
+        blackboard.plan = plan
+        state.local_memory = {
+            "last_intent": plan.intent.value,
+            "last_action": plan.action.value,
+            "last_objective": plan.objective,
+        }
+        verb = "neu geplant" if is_replan else "geplant"
+        return [
+            AgentMessage(
+                sender=MessageEndpoint.PLANNER,
+                recipient=MessageEndpoint.TUTOR,
+                performative=MessagePerformative.DELEGATE,
+                kind=MessageKind.EXECUTE_PLAN,
+                round=blackboard.current_round,
+                summary=f"Aktion {plan.action.value} {verb} und an Tutor delegiert.",
+                payload={"plan": plan},
+            )
+        ]
 
     @staticmethod
     def _parse_plan(raw: dict[str, Any] | None) -> AgentPlan | None:

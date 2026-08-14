@@ -141,5 +141,34 @@ async def test_openai_failure_rollback():
         
         mock_db.commit.assert_awaited()
         mock_db.rollback.assert_awaited_once()
-        # Even if DB fails, currently it still sends websocket notification
+        # A failed commit must still produce one explicit failure notification.
         mock_send.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_generation_failure_is_not_reported_as_success():
+    mock_doc = MagicMock()
+    mock_doc.__len__.return_value = 1
+    mock_page = MagicMock()
+    mock_page.get_text.return_value = "Readable exercise text"
+    mock_doc.__getitem__.return_value = mock_page
+
+    mock_db = AsyncMock()
+    mock_db.add = MagicMock()
+    mock_db_cls = MagicMock()
+    mock_db_cls.return_value.__aenter__.return_value = mock_db
+
+    mock_client = AsyncMock()
+    mock_client.beta.chat.completions.parse = AsyncMock(side_effect=RuntimeError("provider unavailable"))
+    mock_client.embeddings.create = AsyncMock(side_effect=RuntimeError("embeddings unavailable"))
+
+    with patch("app.services.document_analyzer.pymupdf.open", return_value=mock_doc), \
+         patch("app.services.document_analyzer.AsyncSessionLocal", mock_db_cls), \
+         patch("app.services.document_analyzer.client", mock_client), \
+         patch("app.services.document_analyzer.manager.send_personal_message", new_callable=AsyncMock) as mock_send:
+        await analyze_document_background_task("doc_failed", "failed.pdf", "user_3")
+
+    mock_send.assert_awaited_once()
+    notification = mock_send.await_args.args[1]
+    assert notification["type"] == "DOCUMENT_ANALYSIS_FAILED"
+    assert notification["document_id"] == "doc_failed"

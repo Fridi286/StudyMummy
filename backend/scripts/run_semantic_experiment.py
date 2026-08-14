@@ -1,7 +1,10 @@
 import asyncio
 from statistics import mean
 from types import SimpleNamespace
+from typing import Any, cast
 
+from app.agents.orchestrator import AgentOrchestrator
+from app.agents.protocol import AgentContext, AgentRunResult, ToolConversationResult
 from app.core.logging import get_trace_id, trace_id_var
 from app.evaluation.metrics import ChatRun, compare_trace_runs, evaluate_chat_run
 from app.services.llm_service import LLMService
@@ -38,6 +41,32 @@ class FakeCompletions:
 class FakeClient:
     def __init__(self, responses):
         self.chat = SimpleNamespace(completions=FakeCompletions(responses))
+
+
+class FakeMASLLM:
+    """Deterministic specialist outputs; the MAS runtime itself remains production code."""
+
+    def __init__(self):
+        self.structured: list[dict[str, Any] | None] = [
+            None,
+            {
+                "approved": False,
+                "feedback": "Die Antwort nimmt die Lösung vorweg.",
+                "requires_replan": False,
+                "revised_response": "Stelle eine aktivierende Rückfrage.",
+            },
+            {"approved": True, "feedback": "Die Revision erfüllt den Plan."},
+        ]
+        self.drafts = [
+            "Die Lösung ist x = -2.",
+            "Was bedeutet der Schnittpunkt des Graphen mit der x-Achse?",
+        ]
+
+    async def complete_json(self, **_kwargs: Any) -> dict[str, Any] | None:
+        return self.structured.pop(0)
+
+    async def chat_with_tools(self, **_kwargs: Any) -> ToolConversationResult:
+        return ToolConversationResult(response=self.drafts.pop(0))
 
 
 def _tool_call(user_answer: str):
@@ -107,16 +136,16 @@ async def study_mummy_react_run(
         ]
     )
 
-    response_text, tool_calls = await service.chat_with_tools(
+    result = await service.chat_with_tools(
         messages=[{"role": "user", "content": INPUT_TEXT}]
     )
 
     return ChatRun(
         variant="react_with_tools_and_tracing",
         input_text=INPUT_TEXT,
-        response_text=response_text,
+        response_text=result.response,
         trace_id=get_trace_id(),
-        tool_calls=tuple(tool_calls),
+        tool_calls=tuple(result.successful_tool_names),
         expected_tools=EXPECTED_TOOLS,
     )
 
@@ -141,6 +170,21 @@ async def study_mummy_react_runs() -> list[ChatRun]:
     ]
 
 
+async def study_mummy_mas_run() -> AgentRunResult:
+    """Exercise message routing, critique, revision, and final acceptance."""
+    llm = cast(LLMService, cast(object, FakeMASLLM()))
+    return await AgentOrchestrator(llm).run(
+        AgentContext(
+            user_id="experiment_user",
+            session_id="experiment_session",
+            message=INPUT_TEXT,
+            current_task_id="task_01",
+            history=[{"role": "user", "content": INPUT_TEXT}],
+            current_time="2026-08-14T12:00:00+00:00",
+        )
+    )
+
+
 async def main() -> None:
     runs = baseline_runs() + await study_mummy_react_runs()
     rows = [evaluate_chat_run(run) for run in runs]
@@ -162,6 +206,18 @@ async def main() -> None:
     trace_comparison = compare_trace_runs(react_runs[:2])
     print()
     print("Trace comparison:", trace_comparison)
+
+    mas_result = await study_mummy_mas_run()
+    print()
+    print(
+        "MAS coordination:",
+        {
+            "agents": mas_result.agents_involved,
+            "rounds": mas_result.coordination_rounds,
+            "messages": [item.kind.value for item in mas_result.communications],
+            "final_response": mas_result.response,
+        },
+    )
 
 
 if __name__ == "__main__":

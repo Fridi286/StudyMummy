@@ -118,7 +118,7 @@
                }">
           </div>
         </button>
-        <p-menu #userMenu [model]="menuItems" [popup]="true" appendTo="body"></p-menu>
+        <app-action-menu #userMenu [model]="menuItems ?? []" styleClass="w-56" ariaLabel="User menu"></app-action-menu>
       </div>
     </div>
   </div>
