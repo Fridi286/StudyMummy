@@ -37,9 +37,21 @@ class Settings(BaseSettings):
     # HAW ICC Fallback
     haw_icc_api_key: str | None = None
     haw_icc_base_url: str = "https://llm.inf.haw-hamburg.de/v1"
+
+    _insecure_secret_keys: ClassVar[set[str]] = {
+        "change_me_in_production_use_a_32_plus_byte_random_hex_string_here",
+        "replace-with-a-random-32-byte-secret",
+        "development-only-change-me",
+    }
     
     @model_validator(mode="after")
     def apply_haw_icc_fallback(self) -> "Settings":
+        if self.app_env.casefold() == "production" and (
+            len(self.secret_key) < 32 or self.secret_key in self._insecure_secret_keys
+        ):
+            raise ValueError(
+                "SECRET_KEY must be a non-placeholder value of at least 32 characters in production"
+            )
         if self.openai_api_key == "MISSING_KEY" or not self.openai_api_key:
             if self.haw_icc_api_key:
                 self.openai_api_key = self.haw_icc_api_key

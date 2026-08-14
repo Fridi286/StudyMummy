@@ -77,7 +77,7 @@ async def test_chat_with_tools_handles_invalid_tool_arguments_semantically():
 
     assert "Tool-Eingabe" in reply
     assert "?" in reply
-    assert tool_calls == ["evaluate_answer"]
+    assert tool_calls == []
 
 
 @pytest.mark.asyncio

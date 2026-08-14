@@ -12,7 +12,7 @@ SAFE_TOOL_POLICY: dict[AgentAction, set[str]] = {
     AgentAction.ASK_SOCRATIC_QUESTION: {"evaluate_answer"},
     AgentAction.GIVE_HINT: {"evaluate_answer"},
     AgentAction.EXPLAIN: {"evaluate_answer"},
-    AgentAction.EVALUATE: {"evaluate_answer", "award_coins_and_exp"},
+    AgentAction.EVALUATE: {"evaluate_answer", "update_learning_profile", "award_coins_and_exp"},
     AgentAction.CREATE_PLAN: set(),
     AgentAction.SCHEDULE: {"add_calendar_note"},
     AgentAction.CLARIFY: set(),
@@ -25,7 +25,7 @@ Du antwortest ausschliesslich als JSON mit diesen Feldern:
 - action: ask_socratic_question, give_hint, explain, evaluate, create_plan, schedule oder clarify
 - objective: ein kurzer, beobachtbarer Zweck
 - decision_basis: kurze fachliche Entscheidungsgrundlage, keine interne Gedankenkette
-- tool_names: nur evaluate_answer, award_coins_and_exp oder add_calendar_note
+- tool_names: nur evaluate_answer, update_learning_profile, award_coins_and_exp oder add_calendar_note
 - success_criteria: 1 bis 3 pruefbare Kriterien
 
 Plane nur einen Schritt. Verrate bei niedriger Hilfestufe keine vollstaendige Loesung.
@@ -94,7 +94,7 @@ class PlanningAgent:
                 action=AgentAction.EVALUATE,
                 objective="Die Antwort bewerten und mit einer passenden nächsten Lernfrage fortfahren.",
                 decision_basis="Es liegt eine Antwort zu einer aktiven Aufgabe vor.",
-                tool_names=["evaluate_answer", "award_coins_and_exp"],
+                tool_names=["evaluate_answer", "update_learning_profile", "award_coins_and_exp"],
                 success_criteria=["Bewertung ist fachlich begründet", "Feedback passt zur Hilfestufe"],
             )
         if any(word in text for word in ("lösung", "loesung", "rechne vor", "schritt für schritt")):

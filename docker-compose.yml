@@ -11,7 +11,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-studymummy}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       # Mount initialization script to auto-run on container start
@@ -38,12 +38,13 @@ services:
       - APP_NAME=StudyMummy API
       - APP_ENV=development
       - LOG_LEVEL=INFO
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/studymummy
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-studymummy}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - OPENAI_MODEL=${OPENAI_MODEL}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
       - HAW_ICC_API_KEY=${HAW_ICC_API_KEY}
-      - HAW_ICC_BASE_URL=${HAW_ICC_BASE_URL}
-      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-}
+      - HAW_ICC_BASE_URL=${HAW_ICC_BASE_URL:-https://llm.inf.haw-hamburg.de/v1}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-text-embedding-3-small}
+      - SECRET_KEY=${SECRET_KEY:-development-only-change-me}
     depends_on:
       db:
         condition: service_healthy
@@ -82,12 +83,13 @@ services:
       - APP_NAME=StudyMummy API
       - APP_ENV=production
       - LOG_LEVEL=INFO
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/studymummy
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-studymummy}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - OPENAI_MODEL=${OPENAI_MODEL}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
       - HAW_ICC_API_KEY=${HAW_ICC_API_KEY}
-      - HAW_ICC_BASE_URL=${HAW_ICC_BASE_URL}
-      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-}
+      - HAW_ICC_BASE_URL=${HAW_ICC_BASE_URL:-https://llm.inf.haw-hamburg.de/v1}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-text-embedding-3-small}
+      - SECRET_KEY=${SECRET_KEY:-change_me_in_production_use_a_32_plus_byte_random_hex_string_here}
     depends_on:
       db:
         condition: service_healthy

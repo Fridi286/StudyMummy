@@ -205,12 +205,15 @@ register(ToolDefinition(
 
 # ─── update_learning_profile ──────────────────────────────────────────────────
 async def _update_learning_profile(
-    user_id: str,
     tag: str,
     score: float,
     error_pattern: str = "",
 ) -> ToolResult:
-    """Aktualisiert Confidence-Wert und Fehlerpattern persistent."""
+    """Aktualisiert das Lernprofil des authentifizierten Request-Nutzers."""
+    user_id = current_user_id.get()
+    if not user_id:
+        return {"error": "Kein user_id im authentifizierten Request-Kontext"}
+
     log.info("update_learning_profile called", extra={"user_id": user_id})
     clamped_score = _clamp_score(score)
     persisted = False
@@ -252,16 +255,15 @@ async def _update_learning_profile(
 
 register(ToolDefinition(
     name="update_learning_profile",
-    description="Speichert den neuen Confidence-Wert für ein spezifisches Konzept (Tag) im Nutzerprofil. WICHTIG: Verwenden Sie immer hochgradig spezifische, granulare Konzept-Tags (z.B. 'Partielle Integration', 'Mitochondrien') anstelle von generischen Kategorien (z.B. 'Mathe', 'Biologie').",
+    description="Speichert den neuen Confidence-Wert für ein spezifisches Konzept (Tag) im Profil des authentifizierten Nutzers. WICHTIG: Verwenden Sie immer hochgradig spezifische, granulare Konzept-Tags (z.B. 'Partielle Integration', 'Mitochondrien') anstelle von generischen Kategorien (z.B. 'Mathe', 'Biologie').",
     parameters={
         "type": "object",
         "properties": {
-            "user_id": {"type": "string"},
             "tag": {"type": "string", "description": "Das granulare Konzept-Tag (z.B. 'Partielle Integration')."},
             "score": {"type": "number", "minimum": 0.0, "maximum": 1.0},
             "error_pattern": {"type": "string", "description": "Optional erkanntes Fehlerpattern."},
         },
-        "required": ["user_id", "tag", "score"],
+        "required": ["tag", "score"],
     },
     fn=_update_learning_profile,
 ))
@@ -439,6 +441,12 @@ async def _add_calendar_note(title: str, content: str, start_time: str, end_time
         end_dt = datetime.fromisoformat(end_time.replace('Z', '+00:00'))
     except ValueError as e:
         return {"error": f"Ungültiges Datumsformat: {e}"}
+
+    try:
+        if end_dt <= start_dt:
+            return {"error": "end_time muss nach start_time liegen"}
+    except TypeError:
+        return {"error": "start_time und end_time müssen kompatible Zeitzonen verwenden"}
 
     async with AsyncSessionLocal() as db:
         note = CalendarNote(

@@ -46,7 +46,7 @@ Prinzipien:
 1. Stelle immer eine Rueckfrage, bevor du erklaerst.
 2. Passe dein Hilfeniveau dynamisch an.
 3. Wenn der Nutzer eine gute Loesung oder kluge Frage einbringt (angemessen zur Schwierigkeit), belohne ihn mit dem Tool `award_coins_and_exp`!
-4. Wenn eine Aufgabe geloest ist, aktualisiere das Lernprofil.
+4. Aktualisiere das Lernprofil ausschliesslich bei der verbindlichen Aktion `evaluate` und erst nach einer fachlichen Bewertung.
 5. Wenn der Nutzer eine Lerneinheit, Pruefung oder Deadline erwaehnt, biete an oder trage es direkt als Termin mit dem Tool `add_calendar_note` ein.
 6. Antworte immer auf Deutsch, klar und motivierend.
 
@@ -56,9 +56,11 @@ Level 2 = konkreter Hinweis auf den naechsten Schritt.
 Level 3 = Schritt-fuer-Schritt-Anleitung, aber mit aktiver Rueckfrage.
 Level 4 = ausfuehrliche Loesung mit Erklaerung, wenn der Nutzer sie klar braucht.
 
-Wenn du Nutzerantworten bewertest, nutze evaluate_answer mit task_id, user_answer,
-expected_concept und help_level. Nutze danach update_learning_profile mit user_id,
-tag, score und optional error_pattern."""
+Wenn du Nutzerantworten bei der Aktion `evaluate` bewertest, nutze evaluate_answer
+mit task_id, user_answer, expected_concept und help_level. Nutze danach
+update_learning_profile mit tag, score und optional error_pattern. Die Identitaet
+fuer Lernprofil-Aktualisierungen stammt ausschliesslich aus dem authentifizierten
+Request-Kontext; uebergib niemals eine user_id."""
 
 
 def build_tutor_system_prompt(
@@ -79,7 +81,10 @@ def build_tutor_system_prompt(
         f"Aktuelle Hilfestufe: Level {bounded_level}. {level_guidance}",
     ]
     if user_id:
-        context_lines.append(f"Aktueller user_id fuer Lernprofil-Tools: {user_id}")
+        context_lines.append(
+            "Lernprofil-Tools sind an den authentifizierten Request-Kontext gebunden; "
+            "uebergib keine user_id."
+        )
     if task_id:
         context_lines.append(f"Aktuelle task_id: {task_id}")
     return "\n".join(context_lines)
@@ -273,7 +278,6 @@ class LLMService:
                     })
                     continue
 
-                tool_calls_made.append(fn_name)
                 try:
                     fn_args = json.loads(tc.function.arguments or "{}")
                 except json.JSONDecodeError as e:
@@ -291,6 +295,7 @@ class LLMService:
                 try:
                     tool_def = get(fn_name)
                     result = await tool_def.fn(**fn_args)
+                    tool_calls_made.append(fn_name)
                 except KeyError as e:
                     result = {"error": str(e)}
                 except Exception as e:

@@ -1,4 +1,7 @@
 from app.evaluation.metrics import ChatRun, compare_trace_runs, evaluate_chat_run
+from scripts.run_semantic_experiment import study_mummy_react_run
+
+import pytest
 
 
 def test_evaluate_chat_run_scores_socratic_tool_use_semantically():
@@ -64,3 +67,15 @@ def test_compare_trace_runs_detects_stable_repeated_input():
     assert comparison["unique_trace_ids"] == 2
     assert comparison["same_tool_sequence"] is True
     assert comparison["response_shape_stable"] is True
+
+
+@pytest.mark.asyncio
+async def test_semantic_experiment_uses_openai_compatible_function_tool_call():
+    run = await study_mummy_react_run(
+        trace_id="a3f9b1c2",
+        user_answer="Ich weiss es nicht",
+        final_response="Welche Bedeutung hat der Schnittpunkt mit der x-Achse?",
+    )
+
+    assert run.response_text.endswith("?")
+    assert run.tool_calls == ("evaluate_answer",)

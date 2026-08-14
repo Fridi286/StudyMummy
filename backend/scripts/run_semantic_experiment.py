@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from app.core.logging import get_trace_id, trace_id_var
 from app.evaluation.metrics import ChatRun, compare_trace_runs, evaluate_chat_run
 from app.services.llm_service import LLMService
+import app.tools.study_tools  # noqa: F401  # Register production tools for this standalone run.
 
 
 INPUT_TEXT = "Ich verstehe die Nullstelle nicht."
@@ -42,6 +43,7 @@ class FakeClient:
 def _tool_call(user_answer: str):
     return SimpleNamespace(
         id="call_evaluate_answer",
+        type="function",
         function=SimpleNamespace(
             name="evaluate_answer",
             arguments=(
