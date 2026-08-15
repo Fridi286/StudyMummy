@@ -1,6 +1,0 @@
-$pdf_mode = 4; # LuaLaTeX
-$lualatex = 'lualatex %O %S';
-$bibtex = 'biber %O %B';
-$jobname = 'Beims_Frithjof_HausarbeitAgenticAI';
-$out_dir = 'build';
-$aux_dir = 'build';
