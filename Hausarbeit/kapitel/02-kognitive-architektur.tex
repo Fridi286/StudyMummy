@@ -3,138 +3,154 @@
 
 \subsection{Ist-Architektur: Perception, Memory, Planning und Action}
 
-Als Beobachtungsrahmen wird zwischen Perception, Memory, Planning und Action
-unterschieden. Diese Zuordnung ist eine konzeptionelle Analyse des Codes, keine
-Behauptung, dass vier eigenständige Laufzeitmodule existieren. CoALA präzisiert
-für Sprachagenten insbesondere explizites Arbeits- und Langzeitgedächtnis,
-interne und externe Aktionen sowie einen wiederholten Entscheidungszyklus
-\parencite{sumersEtAl2024}. StudyMummy realisiert Teile davon als
-FastAPI-Endpunkt, Datenbankservices und drei LLM-Rollen.
+Das Vier-Schichten-Modell aus Perception, Memory, Planning und Action dient als
+Analyserahmen. Die Zuordnung in \Cref{tab:vier-schichten} rekonstruiert den Code
+konzeptionell. Vier eigenständige Laufzeitmodule gibt es nicht. CoALA beschreibt
+dafür modulare Gedächtnisse, interne und externe Aktionen sowie einen
+wiederholten Entscheidungszyklus \parencite{sumersEtAl2024}. StudyMummy verteilt
+diese Funktionen auf FastAPI- und Datenbankdienste sowie drei kommunizierende
+Spezialagenten.
 
-Der konkrete Kontrollfluss beginnt in \texttt{chat()}: Eingabe filtern,
-Eigentum an Aufgabe und Dokument prüfen, Sitzungszustand laden und Hilfestufe
-aktualisieren, Nutzerturn speichern, RAG-Kontext abrufen und den typisierten
-\texttt{AgentContext} bilden. Der Orchestrator ruft danach Planner, Tutor und
-optional Reviewer auf. Erst außerhalb des Orchestrators speichert der Endpunkt
-die finale Antwort und ergänzt den Trace-Schritt \enquote{remember}. Dieser
-letzte Punkt ist relevant: Persistenz ist vorhanden, aber nicht Teil einer
-lernfähigen Rückkopplung des Orchestrators.
+\begin{table}[htbp]
+  \centering
+  \footnotesize
+  \begin{tabularx}{\linewidth}{@{}p{0.16\linewidth}p{0.40\linewidth}X@{}}
+    \toprule
+    Schicht & Konkreter Ist-Träger & Wesentliche Grenze \\
+    \midrule
+    Perception & Eingabefilter, Eigentumsprüfung, Kontextbildung und Retrieval
+      & selektive Repräsentation, kein prädiktives Weltmodell \\
+    Memory & Promptkontext, MAS-Blackboard, lokale Agentenzustände,
+      Session/Chatlog, Dokumentvektoren und Lernprofil
+      & Laufzustand flüchtig, keine Episodenkonsolidierung \\
+    Planning & \texttt{AgentPlan}, Capability-Policy und begrenztes Replanning
+      & höchstens vier Runden, kein Search oder Lookahead \\
+    Action & Tutorantwort und freigegebene Function Calls
+      & schreibende Wirkung tritt vor dem Reviewer ein \\
+    \bottomrule
+  \end{tabularx}
+  \caption{Ist-Zuordnung der vier kognitiven Schichten in StudyMummy.}
+  \label{tab:vier-schichten}
+\end{table}
+
+Der Kontrollfluss beginnt in \texttt{chat()}: Eingabe und Eigentum werden
+geprüft, Sitzung und Hilfestufe aktualisiert, der Nutzerturn gespeichert und der
+\texttt{AgentContext} einschließlich RAG gebildet. Danach legt die MAS-Laufzeit
+eine \texttt{plan\_request}-Nachricht in den FIFO-Bus. Planner, Tutor und
+optional Reviewer bearbeiten adressierte Nachrichten. Kritik erzeugt eine
+\texttt{revision\_request} oder \texttt{replan\_request}. Die finale Antwort
+speichert anschließend der API-Endpunkt. Persistenz ist somit vorhanden, liegt
+aber außerhalb der lernenden Rückkopplung des Orchestrators.
 
 \subsubsection{Perception}
 
-Die Rohwahrnehmung besteht aus freier Nutzereingabe und Datenbankzustand.
+Rohdaten sind Nutzereingabe, Frontend-Kontext und Datenbankzustand.
 \texttt{filter\_user\_input()} normalisiert Unicode, entfernt unsichtbare
-Steuerzeichen, reduziert Leerraum, begrenzt auf 4.000 Zeichen und blockiert
-einige reguläre Ausdrücke für direkte Prompt-Injection. Anschließend verknüpft
-\texttt{\_resolve\_study\_context()} die Nachricht nur mit Aufgaben und
-Dokumenten des authentifizierten Nutzers. Die Hilfestufe wird anhand weniger
-Schlüsselwörter deterministisch auf 1 bis 4 angehoben. Für RAG wird die Frage
-mit dem vertrauenswürdigen Aufgabenkontext kombiniert, der Abruf filtert nach
-\texttt{user\_id} und optional \texttt{document\_id}.
+Steuerzeichen, begrenzt die Eingabe auf 4.000 Zeichen und blockiert einige
+Muster direkter Prompt-Injection. \texttt{\_resolve\_study\_context()} bindet
+nur nutzereigene Aufgaben und Dokumente ein. Wenige Schlüsselwörter erhöhen die
+Hilfestufe deterministisch von 1 bis 4. Das Retrieval kombiniert Frage und
+Aufgabe und filtert nach Nutzer sowie optional nach Dokument. Der resultierende
+\texttt{AgentContext} erdet den Turn sprachlich und dokumentbezogen, simuliert
+aber keine Folgen möglicher Aktionen.
 
-Die resultierende Repräsentation ist zweckmäßig, aber selektiv. Der Planner
-erhält weder Dokumentinhalt noch Dialoghistorie, sondern nur Nachricht,
-Hilfestufe, Aufgabe und ein boolesches Kontextmerkmal. Das reduziert
-Injection-Risiken, verhindert aber dokumentabhängige Planung. Umgekehrt kann
-\texttt{extra\_context} bis zu 12.000 Zeichen aus dem Frontend enthalten und
-wird nicht durch den Eingabefilter geprüft. RAG-Text wird im Tutor-Prompt zwar
-als nicht vertrauenswürdig markiert, eine strukturelle Trennung von Daten und
-Anweisungen findet jedoch nicht statt. Fehlgeschlagener Retrieval-Zugriff führt
-laut \texttt{rag\_service.py} still zu leerem Kontext und ist für Planner und
-Nutzer nicht unterscheidbar von einem legitimen Treffer ohne Ergebnis.
+Die Repräsentation bleibt selektiv. Der Planner sieht Nachricht, Hilfestufe,
+Aufgabe und ein Kontextmerkmal, aber weder RAG-Inhalt noch Historie. Erst bei
+Neuplanung erhält er vorherigen Plan, Kritik und Toolbeobachtungen. Das begrenzt
+Injection, verhindert jedoch dokumentabhängige Erstplanung. Der ungefilterte
+\texttt{extra\_context} darf dagegen 12.000 Zeichen umfassen. Tutor und Reviewer
+erhalten Frontend-, RAG- und Aufgabentext als nicht vertrauenswürdige Lerndaten,
+doch Daten und Anweisungen stehen weiterhin in derselben Systemnachricht.
+Eigentumsprüfung sichert nur die Zuordnung zum Nutzer, nicht den Inhalt.
+Retrieval-Fehler degradieren zudem still zu leerem Kontext und bleiben von einem
+legitimen Ergebnis ohne Treffer ununterscheidbar.
 
 \subsubsection{Memory}
 
-Das Arbeitsgedächtnis ist explizit in \texttt{Session} und
-\texttt{WorkingMemory} modelliert: aktive Aufgabe, Hilfestufe und kompletter
-Dialog werden vor jedem Turn geladen. In CoALA ist ein solches
-Arbeitsgedächtnis eine über LLM-Aufrufe persistente Datenstruktur und nicht nur
-das Kontextfenster \parencite{sumersEtAl2024}. StudyMummy erfüllt dies teilweise,
-kopiert jedoch die gesamte Historie ohne Tokenbudget, Zusammenfassung oder
-Vergessen in jeden Tutoraufruf. Lange Sitzungen wachsen daher unbeschränkt bis
-zum Providerlimit.
+Kurzfristig sind Promptbuffer, modelllokales Kontextfenster und
+anwendungsseitiges Arbeitsgedächtnis zu trennen. \texttt{Session} und das
+rekonstruierte \texttt{WorkingMemory} halten aktive Aufgabe, Hilfestufe und
+Dialog über Aufrufe hinweg. Das entspricht CoALAs Verständnis einer expliziten
+Arbeitsgedächtnisstruktur \parencite{sumersEtAl2024}. Allerdings wird die gesamte
+Historie ohne Tokenbudget, Zusammenfassung oder Vergessen an den Tutor kopiert.
 
-Episodisch persistieren \texttt{ChatLog}-Datensätze Rolle, Inhalt, Zeitpunkt
-und die finale Aktion. Pläne, Reviewer-Feedback, Werkzeugargumente,
-Werkzeugresultate und Erfolg oder Fehlschlag werden nicht gespeichert und
-können später nicht gezielt abgerufen werden. Semantisches Gedächtnis besteht
-aus hochgeladenen Dokumenten: Der Analyzer zerlegt Volltext mit
-\texttt{textwrap.wrap} in ungefähr 1.000 Zeichen lange Chunks, erzeugt
-Embeddings und speichert 1.536-dimensionale Vektoren in PostgreSQL. Online
-werden die drei Chunks mit kleinster Kosinusdistanz geladen. Eine
-Ähnlichkeitsschwelle, ein Reranker, überlappende oder strukturerhaltende Chunks
-und Quellenzitate fehlen. Lernprofile und Confidence Scores bilden zwar einen
-weiteren Langzeitspeicher, bleiben im analysierten Chatpfad aber ungenutzt.
+Das run-lokale \texttt{AgentBlackboard} hält Plan, Entwurf, Review und
+Toolbeobachtungen. Getrennte \texttt{AgentLocalState}-Objekte enthalten Ziel,
+Befugnisse, Zähler und kleine lokale Erinnerungen. Nach dem Turn werden sie
+verworfen. \texttt{ChatLog} speichert zwar Rolle, Inhalt, Zeit und finale
+Aktion, aber keine Pläne, Kritik oder Toolresultate. Ein gezielt abrufbares
+Episodengedächtnis entsteht daher nicht. Semantisches Gedächtnis bilden etwa
+1.000 Zeichen lange Dokumentchunks und 1.536-dimensionale Vektoren. Abgerufen
+werden die drei kleinsten Kosinusdistanzen. Schwelle, Reranking, Überlappung,
+Strukturerhalt und Quellenzitate fehlen. Die feste DB-Dimension kann außerdem
+mit einem anders dimensionierten Embedding-Modell kollidieren. Das
+nutzergebundene Lernprofil-Tool ist nur bei \texttt{evaluate} erlaubt, erzwingt
+aber weder eine erfolgreiche vorherige Bewertung noch die Herkunft des Scores.
+Bestehende Profilwerte erreichen Planner und Tutor nicht.
 
 \subsubsection{Planning}
 
-Der Planning Agent erzeugt mit Temperatur 0 ein \texttt{AgentPlan}-Objekt aus
-Intent, genau einer Aktion, Ziel, kurzer Entscheidungsbasis, Werkzeugnamen und
-Erfolgskriterien. Pydantic validiert das JSON. Bei Provider- oder
-Strukturfehlern greift ein deterministischer, schlüsselwortbasierter Fallback.
-Danach schneidet \texttt{SAFE\_TOOL\_POLICY} die vorgeschlagenen Rechte auf ein
-aktionsabhängiges Set zurück. Diese Kombination ist nachvollziehbarer als ein
-freier Prompt und implementiert eine begrenzte deliberative Auswahl.
+Der Planning Agent erzeugt mit Temperatur 0 einen \texttt{AgentPlan} aus Intent,
+einer Aktion, Ziel, Entscheidungsbasis, Toolnamen und Erfolgskriterien. Pydantic
+validiert das geparste Objekt. Bei Provider- oder Strukturfehlern greift ein
+regelbasierter Schlüsselwort-Fallback. Anschließend reduziert
+\texttt{SAFE\_TOOL\_POLICY} die vorgeschlagenen Rechte aktionsabhängig. Das ist
+nachvollziehbarer als ein freier Prompt, bleibt aber eine begrenzte Auswahl.
 
-Sie ist jedoch weder hierarchische Zielzerlegung noch Closed-Loop-Planung. Der
-Planner kennt Werkzeugbeobachtungen nicht, bewertet keine Alternativen und wird
-nach Toolfehler oder Reviewer-Ablehnung nicht erneut aufgerufen. Der Tutor darf
-innerhalb einer Aktion bis zu fünf Function-Calling-Runden ausführen, diese
-lokale Schleife ähnelt ReAct, während der übergeordnete Plan unverändert bleibt.
-ReAct begründet gerade den Nutzen, Reasoning und externe Beobachtung
-abwechselnd zur Planaktualisierung zu verwenden \parencite{yaoEtAl2023react}.
-StudyMummy nutzt die Beobachtung nur im Tutor-Dialog, nicht im typisierten
-Planungszustand.
+Suchplanung, Lookahead und hierarchische Zielzerlegung fehlen. Der Reviewer
+wählt nach jedem Entwurf zwischen Freigabe, toolfreier Revision und Neuplanung.
+Für Letztere erhält der Planner Kritik, vorherigen Plan und Toolbeobachtungen.
+Konfigurierbar sind eine bis vier, standardmäßig zwei Koordinationsrunden. Der
+Tutor hat je Aktion höchstens fünf Function-Calling-Runden. Die Rückführung auch
+fehlgeschlagener Beobachtungen folgt ReActs Wechsel von Reasoning und externer
+Beobachtung \parencite{yaoEtAl2023react}. Trotzdem wird nur ein Plan erzeugt,
+nicht zwischen simulierten Zukunftszuständen gesucht.
 
 \subsubsection{Action}
 
-Action umfasst Textausgabe und echte Function Calls. Der LLM-Adapter bietet nur
-die freigegebenen JSON-Schemas an, blockiert unbekannte Namen erneut, parst
-Argumente und gibt Werkzeugresultate als \texttt{tool}-Nachricht an den Tutor
-zurück. JSON-Fehler und Python-Ausnahmen werden in eine Fehlerbeobachtung
-umgewandelt. Praktisch erreichbar sind Antwortbewertung, Vergabe virtueller
-Coins/Erfahrung und ein Kalendereintrag. Die Belohnung bindet die Identität über
-einen Request-Kontext, begrenzt den Betrag, prüft Aufgabeneigentum unter
-Datenbanksperre und verhindert Doppelbelohnung.
+Action umfasst Text und Function Calls. Der Adapter exponiert nur freigegebene
+Schemas, blockiert unbekannte Namen erneut und führt Resultate als
+\texttt{tool}-Nachrichten zurück. \texttt{ToolObservation} unterscheidet
+\texttt{succeeded}, \texttt{failed}, \texttt{blocked} und
+\texttt{invalid\_arguments}. Erreichbar sind Antwortbewertung,
+Lernprofil-Update, Coins/Erfahrung und Kalender. Nutzeridentitäten stammen aus
+dem authentifizierten Request. Belohnungen sind betragsbegrenzt, prüfen
+Aufgabeneigentum unter Sperre und verhindern Doppelvergabe. Der Kalender
+verwirft nichtpositive Intervalle.
 
-Der Reviewer sieht anschließend nur Plan und fertigen Entwurf. Er kann Text
-ersetzen, aber einen bereits angelegten Termin oder eine Belohnung nicht
-zurücknehmen. Bei ungültigem Reviewer-JSON wird der Entwurf sogar freigegeben.
-Außerdem verlangt der Tutor-Prompt ein Lernprofil-Update, obwohl dieses Tool
-laut Policy nie im Scope liegt. Diese Diskrepanz zwischen prozeduralem Wissen
-(Prompt) und ausführbarem Aktionsraum ist ein konkreter Architekturfehler.
+Der Reviewer sieht Nachricht, Hilfestufe, unvertrauenswürdige Kontextfelder,
+Plan, Toolstatus mit Vorschau und Entwurf. Er kann freigeben, toolfrei revidieren
+lassen oder neu planen lassen. Bereits ausgeführte Schreibwirkungen kann er
+nicht zurücknehmen. Ungültiges Reviewer-JSON führt sogar zur Freigabe.
+Lernprofil-Update und Belohnung sind außerdem nicht serverseitig an eine zuvor
+erfolgreiche Bewertung gekoppelt. Das Profil fließt auch nicht in die Planung
+zurück.
 
 \subsection{Kritische Analyse und Grenzen}
 
-Die Schichten sind grundsätzlich erkennbar, aber ihre Rückkopplung ist schwach.
-Erstens ist die persistierte Historie eher ein Gesprächsarchiv als episodisches
-Gedächtnis: Es gibt weder selektiven Abruf noch Konsolidierung und Reflexion.
-Generative Agents zeigen ein Gegenmodell, in dem Erfahrungen gespeichert,
-dynamisch abgerufen und zu höherwertigen Reflexionen verdichtet werden, die
-Ablation der Autoren weist Wahrnehmung, Planung und Reflexion jeweils als
-relevante Beiträge aus \parencite{parkEtAl2023}. Eine Übertragung muss dennoch
-domänenspezifisch evaluiert werden, weil glaubwürdiges Simulationsverhalten
-nicht mit Lernerfolg gleichzusetzen ist.
+Innerhalb eines Turns sind die Schichten rückgekoppelt, über Turn-Grenzen kaum.
+Die Historie bleibt Gesprächsarchiv statt episodischem Gedächtnis: selektiver
+Abruf, Konsolidierung und Reflexion fehlen. Generative Agents speichern
+Erfahrungen, rufen sie dynamisch ab und verdichten sie. Ihre Ablation zeigt
+Beiträge von Wahrnehmung, Planung und Reflexion \parencite{parkEtAl2023}. Dieses
+Ergebnis ist nicht direkt auf Lernerfolg übertragbar, begründet aber die
+Architekturrichtung.
 
-Zweitens ist Kontrolle überwiegend vor der Aktion (Tool-Whitelist) oder nach
-der Antwort (Reviewer) platziert, nicht zwischen Beobachtung und irreversibler
-Wirkung. Das System speichert auch kein überprüftes Outcome, aus dem spätere
-Entscheidungen lernen könnten. Reflexion nutzt verbales Feedback in einem
-episodischen Puffer, um Folgeversuche zu verbessern
-\parencite{shinnEtAl2023reflexion}, zugleich hängt dieses Verfahren von der
-Qualität der Selbstbewertung ab und garantiert keinen Erfolg. Für StudyMummy
-folgt daraus nicht, ungeprüfte Selbstkritik zu akkumulieren, sondern nur
-validiertes Reviewer- und Werkzeugfeedback strukturiert zurückzuführen.
+Kontrolle liegt vor der Aktion in der Whitelist und danach beim Reviewer, nicht
+vor dem Commit einer Schreibwirkung. Toolfehler können Neuplanung auslösen,
+eingetretene Seiteneffekte aber nicht. Ebenso fehlt ein überprüftes Outcome für
+spätere Entscheidungen. Sprachliches Reviewerfeedback kann Folgeversuche
+verbessern, eine ungeprüfte Selbstkritik ist dafür jedoch keine belastbare
+Grundlage. StudyMummy sollte deshalb nur validiertes Reviewer- und Toolfeedback
+übernehmen.
 
 \subsection{Verbesserungsvorschlag 1: Begrenztes, konsolidiertes Episodengedächtnis}
 \label{sec:verbesserung-eins}
 
-Technisch sollte eine Tabelle \texttt{agent\_episodes} ergänzt werden, deren
-Datensatz \texttt{user\_id}, \texttt{session\_id}, \texttt{task\_id}, den
-validierten Plan, ausgeführte Aktion, Werkzeugstatus, Reviewer-Urteil, eine
-knappe Ergebniszusammenfassung, Zeit und optional ein Embedding enthält. Ein
-deterministischer \texttt{MemoryWriter} schreibt erst nach Review und Commit,
-interne Gedankengänge werden nicht gespeichert. Ein
+Eine Tabelle \texttt{agent\_episodes} sollte Nutzer, Sitzung, Aufgabe,
+validierten Plan, Aktion, Toolstatus, Reviewer-Urteil, Ergebnis, Zeit und
+optional ein Embedding speichern. Ein \texttt{MemoryWriter} schreibt erst nach
+Review und Commit. Interne Gedankengänge bleiben ungespeichert. Ein
 \texttt{Memory\allowbreak{}Retriever}
 lädt vor der Planung höchstens drei nutzer- und aufgabengefilterte Episoden nach
 Semantik, Aktualität und Ergebnisstatus. Parallel fasst ein
@@ -142,58 +158,40 @@ Semantik, Aktualität und Ergebnisstatus. Parallel fasst ein
 die letzten Turns bleiben wörtlich. Lernprofil und relevante Confidence Scores
 werden als eigene, vertrauenswürdige Felder in \texttt{AgentContext} gebunden.
 
-Dies überträgt CoALAs Trennung von Arbeits-, episodischem und semantischem
-Gedächtnis sowie den Abruf früherer Episoden in die vorhandene SQLAlchemy- und
-pgvector-Architektur \parencite{sumersEtAl2024}. Erwartet werden stabilere lange
-Sitzungen, gezieltere Wiederaufnahme früherer Fehler und begrenzte Promptgröße.
-Voraussetzungen sind ein Lösch- und Aufbewahrungskonzept, Migrationen und ein
-Evaluationssatz mit Mehrsitzungsverläufen. Zusätzliche Embeddings und Abrufe
-erhöhen Latenz und Kosten, Schema, Zusammenfasser und Retrieval-Scoring erhöhen
-Komplexität und Wartungsaufwand. Die Sicherheitsoberfläche wächst durch
-\emph{Memory Poisoning}: manipulierte Inhalte könnten dauerhaft wiederkehren.
-Daher sind Provenienz, Nutzerisolation, TTL, Löschbarkeit und das Speichern nur
-validierter Outcomes zwingend. Auch Reflexionen dürfen nicht ungeprüft als
-Fakten behandelt werden.
+Damit wird CoALAs Trennung von Arbeits-, episodischem und semantischem
+Gedächtnis auf SQLAlchemy und pgvector übertragen \parencite{sumersEtAl2024}.
+Erwartet werden stabilere lange Sitzungen, gezielte Fehlerwiederaufnahme und
+begrenzte Prompts. Dafür steigen Latenz, Embeddingkosten, Schema- und
+Wartungsaufwand. Dauerhaft wiederkehrende Manipulationen erzeugen zudem
+\emph{Memory Poisoning}. Nötig sind deshalb Provenienz, Nutzerisolation,
+Löschbarkeit, kurze Aufbewahrung und ausschließlich validierte Outcomes.
 
-\subsection{Verbesserungsvorschlag 2: Typisierte Plan--Act--Observe--Replan-Schleife}
+\subsection{Verbesserungsvorschlag 2: Transaktionale Plan--Act--Observe--Replan-Schleife}
 \label{sec:verbesserung-zwei}
 
-Der Orchestrator sollte ein explizites Objekt \texttt{AgentState} führen. Es
-enthält \texttt{plan}, \texttt{observations}, \texttt{attempt},
-\texttt{pending\_\allowbreak side\_\allowbreak effect}, \texttt{review} und
-\texttt{status}. Der Planner ergänzt pro Aktion eine erwartete Beobachtung und
-eine Fehlerstrategie. Zunächst werden nur lesende Werkzeuge ausgeführt, deren
-Resultate werden gegen Pydantic-Schemas validiert. Bei Toolfehler oder
-Reviewer-Ablehnung erhält der Planner die kompakte Beobachtung und darf höchstens
-einmal neu planen. Schreibende Tools werden als \texttt{pending} materialisiert
-und erst nach Policy-Prüfung sowie -- beim Kalender -- Nutzerbestätigung
-committet. Ein Datenbank-Checkpoint vor der Wirkung ermöglicht sauberen Abbruch,
-harte Grenzen für Schritte, Zeit und Toolbudget verhindern Schleifen.
+\texttt{AgentBlackboard}, lokale Zustände, Nachrichten und Toolbeobachtungen
+verbinden bereits Planen, Ausführen, Review und Neuplanung. Für eine
+transaktionale Variante muss der Plan zusätzlich erwartete Beobachtung und
+Fehlerstrategie enthalten. Schreibende Tools werden zunächst als
+\texttt{pending\_side\_effect} vorgeschlagen, von einer
+deterministischen Policy gegen Identität, Aktion und Wertebereiche geprüft und
+erst nach Reviewer-Freigabe sowie beim Kalender nach Nutzerbestätigung
+committet. Ein Datenbank-Checkpoint ermöglicht Abbruch ohne Teilwirkung.
 
-Die Ausgestaltung setzt ReActs alternierende Kopplung von Planen und
-Umweltbeobachtung um, ohne Chain-of-Thought offenzulegen
-\parencite{yaoEtAl2023react}. Validiertes Reviewer-Feedback kann zusätzlich als
-sprachliches Fehlersignal für den nächsten Versuch dienen, entsprechend der
-Grundidee von Reflexion \parencite{shinnEtAl2023reflexion}. Der erwartete Nutzen
-liegt in kontrollierter Fehlerbehandlung, überprüfbaren Abbruchbedingungen und
-dem Schließen der heutigen Lücke, in der Review erst nach Seiteneffekten
-erfolgt. Dem stehen mindestens ein weiterer LLM-Aufruf im Fehlerfall, höhere
-Latenz und Kosten, komplexere Transaktionen und mehr Zustände im Test gegenüber.
-Jeder zusätzliche Rückkopplungskanal kann zudem Injection weitertragen, nur
-strukturierte Beobachtungen und gleichbleibende Capability-Grenzen dürfen in
-die Neuplanung eingehen.
+Das setzt ReActs Kopplung von Plan und Umweltbeobachtung um, ohne
+Chain-of-Thought offenzulegen \parencite{yaoEtAl2023react}. Validiertes Reviewer-
+und Toolfeedback kann dabei als strukturiertes Fehlersignal dienen. Nutzen sind kontrollierte Fehlerbehandlung,
+prüfbare Abbrüche und Review vor der Wirkung. Trade-offs sind zusätzliche
+LLM-Aufrufe, Latenz, Kosten, Transaktionszustände und Tests. Weil Rückkopplung
+auch Injection weitertragen kann, dürfen nur strukturierte Beobachtungen bei
+unveränderten Befugnisgrenzen in die Neuplanung eingehen.
 
 \subsection{Vergleichende Trade-off-Diskussion}
 
-Das Episodengedächtnis verbessert vor allem Langzeitpersonalisation und
-Promptökonomie, vergrößert aber Datenschutz- und Poisoning-Risiken dauerhaft.
-Die Replan-Schleife erhöht die Kosten pro problematischem Turn, begrenzt dafür
-unmittelbar Fehlwirkungen und macht Toolfehler beobachtbar. Priorität hat daher
-Vorschlag~2: Er beseitigt die sicherheitsrelevante Post-hoc-Kontrolle und schafft
-den typisierten Outcome, den Vorschlag~1 später speichern kann. Danach sollte
-das Gedächtnis zunächst ohne automatisch generierte Reflexionen und nur für
-validierte Aufgabenereignisse eingeführt werden. Beide Erweiterungen sind erst
-nach Vergleich gegen den bestehenden Workflow sinnvoll, relevante Kriterien
-sind Planerfüllung, Toolpräzision, Revisionsrate, Latenz, Tokenkosten und
-mehrsitziger Lernfortschritt. Ohne solche Messungen wäre der zusätzliche
-Architekturaufwand nicht begründet.
+Das Episodengedächtnis verbessert Langzeitpersonalisation und Promptökonomie,
+vergrößert aber Datenschutz- und Poisoning-Risiken. Priorität hat daher das
+transaktionale Commit: Es ersetzt Post-hoc-Kontrolle durch ein validiertes
+Outcome, das später gespeichert werden kann. Das Gedächtnis sollte danach ohne
+automatische Reflexionen und nur für validierte Aufgabenereignisse folgen.
+Vergleichsgrößen sind Planerfüllung, Toolpräzision, Revisionsrate, Latenz,
+Tokenkosten und sitzungsübergreifender Lernfortschritt.

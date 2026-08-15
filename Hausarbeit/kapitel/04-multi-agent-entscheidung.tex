@@ -1,74 +1,75 @@
 \section{Multi-Agent-Entscheidung (Kap. 04)}
 \label{sec:multi-agent}
 
-StudyMummy ist ein \emph{hierarchisch orchestriertes, logisches
-Multi-Agent-System}, nicht jedoch ein verteiltes System autonomer Prozesse.
-Planning, Tutor und Reviewer besitzen getrennte Systemprompts, Ziele und
-Pydantic-Ausgabeverträge. Der Planner bestimmt die nächste Aktion und den
-Capability-Scope, der Tutor ist der einzige ausführende Worker, der Reviewer
-verfolgt das unabhängige Kontrollziel und kann den Antworttext ersetzen. Alle
-drei teilen denselben LLM-Adapter und haben keinen eigenen Prozess oder
-dauerhaften lokalen Speicher. Der \texttt{AgentOrchestrator} ist selbst kein
-LLM-Agent, sondern deterministischer Kontrollcode.
+StudyMummy ist in der untersuchten Implementierung als \emph{hierarchisches,
+nachrichtengetriebenes Multi-Agent-System} einzuordnen. Entscheidend ist nicht
+die Zahl der Prompts, sondern ausführbare Agentenmerkmale: Planning, Tutor und
+Reviewer implementieren denselben \texttt{MASAgent}-Vertrag, besitzen je eine
+Identität, ein eigenes Ziel, Capabilities und einen getrennten
+\texttt{AgentLocalState}. Dieser Zustand zählt empfangene und gesendete
+Nachrichten sowie Entscheidungen und hält eine kleine lokale Erinnerung für
+den aktuellen Turn. Alle drei nehmen einen Nachrichtentyp wahr, entscheiden
+innerhalb ihrer Rolle und erzeugen selbst Folgebotschaften.
 
-Die Kommunikation erfolgt ausschließlich sequentiell über typisierte Python-
-Objekte: \texttt{AgentContext} $\rightarrow$ \texttt{AgentPlan}
-$\rightarrow$ Tutorentwurf $\rightarrow$ \texttt{AgentReview}. Es gibt weder
-Peer-to-Peer-Nachrichten noch parallele Workers oder dynamische Delegation.
-Session- und RAG-Services liefern gemeinsamen Zustand, nur der Tutor greift auf
-Werkzeuge zu. Damit ähnelt die Architektur dem Orchestrator/Worker-Muster,
-ergänzt um einen Critic, während Perception und Memory Services und keine
-Agenten sind. Die logische Rollentrennung ist gerechtfertigt, weil
-Planerzeugung, Ausführung und Qualitätskontrolle unterschiedliche Rechte und
-Prüfkriterien besitzen. Für weitere Produktfunktionen eigene Agenten zu
-erzeugen wäre dagegen Koordinationsaufwand ohne Autonomiegewinn.
+Kooperation erfolgt über einen run-lokalen \texttt{MASMessageBus} mit
+Performatives wie \texttt{request}, \texttt{delegate}, \texttt{propose},
+\texttt{critique} und \texttt{accept}. Ein gemeinsames
+\texttt{AgentBlackboard} repräsentiert die veränderliche Umgebung aus Plan,
+Entwurf, Review und Toolbeobachtungen. Der normale Pfad lautet Planner--Tutor--Reviewer.
+Bei Dissens routet der Reviewer autonom eine \texttt{revision\_request} an den
+Tutor oder eine \texttt{replan\_request} an den Planner. Dadurch verändert er
+den Kontrollfluss tatsächlich, statt lediglich einen Text zu ersetzen. Der
+deterministische Orchestrator ist kein vierter Agent: Er dispatcht FIFO,
+erfasst Laufzeiten und beendet nach höchstens der konfigurierten Rundenzahl.
+Perception, Memory und RAG bleiben Umgebungsdienste, nicht künstlich
+umbenannte Agenten.
 
 \begin{center}
 \begin{minipage}{\linewidth}
   \centering
   \begin{tikzpicture}[
     >=Latex,
-    box/.style={draw,rounded corners,align=center,minimum height=8mm,text width=27mm,font=\small},
+    box/.style={draw,rounded corners,align=center,minimum height=8mm,text width=25mm,font=\small},
     role/.style={box,fill=hawblue!8},
-    service/.style={box,fill=gray!10},
-    every path/.style={draw,->,semithick}
+    service/.style={box,fill=gray!10}
   ]
-    \node[box] (ui) at (-4.8,1.5) {Lernende Person\\Angular};
-    \node[box] (api) at (-1.6,1.5) {FastAPI\\\texttt{/agent/chat}};
-    \node[service] (context) at (2.2,1.5) {Kontextbildung\\Session + RAG};
-    \node[service] (orch) at (0,0) {deterministischer\\Orchestrator};
-    \node[role] (planner) at (-5.0,-1.7) {Planning Agent\\\texttt{AgentPlan}};
-    \node[role] (tutor) at (-1.7,-1.7) {Tutor Agent\\Ausführung};
-    \node[role] (reviewer) at (1.7,-1.7) {Reviewer Agent\\Freigabe/Revision};
-    \node[service] (memory) at (5.0,-1.7) {Memory Service\\Chatlog};
-    \node[service] (tools) at (-1.7,-3.6) {Tool Registry\\Side Effects};
-    \node[service] (llm) at (1.7,-3.6) {gemeinsamer OpenAI-kompatibler LLM-Adapter};
-    \node[service] (db) at (5.0,-3.6) {PostgreSQL\\+ pgvector};
+    \node[box] (ui) at (-4.8,1.7) {Lernende Person\\Angular};
+    \node[box] (api) at (-1.6,1.7) {FastAPI\\\texttt{/agent/chat}};
+    \node[service] (env) at (1.6,1.7) {Perception\\Session + RAG};
+    \node[service] (memory) at (4.8,1.7) {Memory\\Chatlog + DB};
+    \node[service,text width=31mm] (bus) at (0,0) {MAS Runtime\\Message Bus + Blackboard};
+    \node[role] (planner) at (-4.2,-1.8) {Planner Agent\\Plan/Replan};
+    \node[role] (tutor) at (0,-1.8) {Tutor Agent\\Act/Revise};
+    \node[role] (reviewer) at (4.2,-1.8) {Reviewer Agent\\Accept/Critique};
+    \node[service] (tools) at (-2.2,-3.6) {Tool Registry\\Side Effects};
+    \node[service,text width=34mm] (llm) at (2.2,-3.6) {gemeinsamer OpenAI-kompatibler LLM-Adapter};
 
-    \path (ui) edge (api);
-    \path (api) edge (context);
-    \path (context) edge (orch);
-    \path (orch) edge (planner);
-    \path (planner) edge (tutor);
-    \path (tutor) edge (reviewer);
-    \path (reviewer) edge (memory);
-    \path (tutor) edge (tools);
-    \path (memory) edge (db);
-    \draw[->,semithick] (tools.south) -- ++(0,-0.9) -| (db.south);
+    \draw[->,semithick] (ui) -- (api);
+    \draw[->,semithick] (api) -- (env);
+    \draw[->,semithick] (env) -- (bus);
+    \draw[->,semithick] (api) -- (memory);
+    \draw[<->,semithick] (bus) -- (planner);
+    \draw[<->,semithick] (bus) -- (tutor);
+    \draw[<->,semithick] (bus) -- (reviewer);
+    \draw[->,semithick] (tutor) -- (tools);
     \draw[dashed,->] (llm) -- (planner);
     \draw[dashed,->] (llm) -- (tutor);
     \draw[dashed,->] (llm) -- (reviewer);
   \end{tikzpicture}
   \captionsetup{hypcap=false}
-  \captionof{figure}{Selbst erstellte logische Multi-Agent-Architektur von StudyMummy, gestrichelt ist der gemeinsam genutzte LLM-Adapter.}
+  \captionof{figure}{Selbst erstellte Ist-Architektur des hierarchischen MAS.
+    Rückpfeile am Bus stehen für Revision und Neuplanung. Volle
+    Nachrichten-Payloads werden nicht an die API serialisiert.}
   \label{fig:mas-architektur}
 \end{minipage}
 \end{center}
 
-\Cref{fig:mas-architektur} macht zugleich die Grenze sichtbar: Der Orchestrator
-kennt die gesamte Ausführungsreihenfolge, die Rollen kommunizieren nicht
-autonom. Präziser als die pauschale Dokumentationsaussage \enquote{MAS} ist
-daher \enquote{rollenbasierte Multi-Agent-Pipeline}. Ein Single-Agent-Entwurf
-wäre kürzer, würde aber Capability-Trennung und unabhängige Review-Schnittstelle
-aufgeben, drei unabhängige Services oder Modelle wären für den linearen
-Turn-Workflow unnötig teuer.
+\Cref{fig:mas-architektur} zeigt zugleich die Abgrenzung: Das MAS ist homogen,
+seriell und in-process. Die Agenten teilen sich einen Modelladapter, besitzen
+keine eigenen Prozesse und ihr lokaler Zustand endet mit dem Turn. Es gibt
+weder Parallelität, freie Aushandlung noch horizontale Fehlerisolation. Ein
+Single-Agent-Entwurf wäre günstiger, würde jedoch die getrennten Ziele,
+Capability-Grenzen und den überprüfbaren Dissenspfad verlieren. Verteilte
+Agentendienste wären umgekehrt ohne Parallelitäts- oder Verfügbarkeitsziel
+unnötig komplex. Die gewählte Mitte liefert echte, aber bewusst begrenzte
+Kooperation und bleibt für einen Tutor-Turn testbar.

@@ -3,8 +3,9 @@
 
 \subsection{PEAS-Analyse}
 
-Ein Agent ist durch seine Wahrnehmung und Wirkung in einer Umgebung bestimmt,
-PEAS zwingt dabei zur expliziten Operationalisierung des Erfolgs
+Ein Agent ist durch seine Wahrnehmung und Wirkung in einer Umgebung bestimmt.
+Performance, Environment, Actuators und Sensors (PEAS) erzwingen dabei die
+explizite Operationalisierung des Erfolgs
 \parencite[Kap.~2]{russellNorvig2021}. Für den Tutor-Workflow ergibt sich
 \cref{tab:peas}.
 
@@ -18,18 +19,21 @@ PEAS zwingt dabei zur expliziten Operationalisierung des Erfolgs
     Performance & Fachlich plausible, nicht leere und zur Hilfestufe passende
     Antwort, Erfüllung von \texttt{success\_criteria}, korrekte Werkzeugwahl
     und Reviewer-Freigabe. Eine einzige numerische Nutzenfunktion existiert
-    nicht. Die separaten Evaluationsmetriken prüfen sokratische Führung,
-    Vermeidung direkter Lösungen, Trace-ID und Tool-Abdeckung. \\
+    nicht. Erfolgskriterien werden LLM-basiert beurteilt, nicht deterministisch
+    gemessen. Die
+    separaten Evaluationsmetriken prüfen lediglich regelbasiert sokratische
+    Führung, direkte Lösungsmuster, Trace-ID und Tool-Abdeckung. \\
     Environment & Authentifizierte Lernende, Angular-Oberfläche, aktuelle
     Aufgaben und Dokumente, PostgreSQL-Zustand, LLM-Anbieter sowie Resultate
     interner Werkzeuge. \\
     Actuators & Tutor-Text als primäre Wirkung, zusätzlich die im Chat
     tatsächlich freigebbaren Werkzeuge \texttt{evaluate\_answer},
-    \texttt{award\_coins\_and\_exp} und \texttt{add\_calendar\_note}. Die
-    letzten beiden verändern persistenten Zustand. \\
+    \texttt{update\_learning\_profile}, \texttt{award\_coins\_and\_exp} und
+    \texttt{add\_calendar\_note}. Die letzten drei verändern persistenten
+    Zustand. \\
     Sensors & Nachricht, Zeit, Dialoghistorie, aktive Aufgabe, Hilfestufe,
     Frontend-Kontext, bis zu drei semantisch ähnliche Dokumentchunks und
-    Werkzeugergebnisse. Die Bildung des \texttt{AgentContext} erfolgt im
+    typisierte Werkzeugbeobachtungen. Die Bildung des \texttt{AgentContext} erfolgt im
     Endpunkt \path{backend/app/api/v1/endpoints/agent.py}. \\
     \bottomrule
   \end{tabularx}
@@ -43,13 +47,17 @@ StudyMummy ist am treffendsten ein \emph{begrenzt modellbasierter,
 zielorientierter und deliberativer} Softwareagent. Modellbasiert ist er, weil
 Sitzung, Aufgabe, Hilfestufe und Historie einen internen Zustand bilden.
 Zielorientiert ist er durch das je Turn erzeugte \texttt{objective} und ein bis
-drei Erfolgskriterien. Der JSON-Plan und die nachfolgende Ausführung gehen über
-einen Reflexagenten hinaus. Eine Einordnung als Utility-Agent wäre dagegen zu
+drei schema-validierte Erfolgskriterien. JSON-Plan, Ausführung und
+begrenzt rückgekoppelte Neuplanung gehen über einen Reflexagenten hinaus. Eine Einordnung als Utility-Agent wäre dagegen zu
 stark: Weder werden konkurrierende Pläne bewertet noch wird erwarteter Nutzen
 maximiert. Auch ein Lernagent im klassischen Sinn ist nicht vollständig
-implementiert. Zwar existieren Lernprofil und Update-Werkzeug, doch die
-Capability-Policy gibt dieses Werkzeug im Chat nie frei und das Profil fließt
-nicht in den \texttt{AgentContext} ein.
+implementiert. Das Lernprofil kann zwar über ein Werkzeug aktualisiert werden,
+das ausschließlich bei der Aktion \texttt{evaluate} freigegeben ist und die
+Nutzeridentität serverseitig bezieht. Das vorhandene Profil fließt jedoch nicht
+in den \texttt{AgentContext} ein. Der Reviewer wirkt als Critic
+auf den laufenden Turn, indem er Revision oder Neuplanung auslöst. Sein Feedback
+aktualisiert aber weder Policy noch Modellparameter und bildet daher kein
+Learning Element über Turns hinweg.
 
 Die Umgebung ist nur \emph{partiell beobachtbar}, da Wissen, Motivation und
 tatsächliches Verständnis der lernenden Person indirekt aus Text erschlossen
@@ -60,6 +68,6 @@ deterministisch, LLM-Ausgaben und Nutzerverhalten jedoch stochastisch. Aktionen
 und Zustände sind in der Implementierung diskret typisiert, der relevante
 Zustandsraum bleibt wegen freier Sprache sehr groß. Die eigenen
 Werkzeugtransitionen sind bekannt, die Reaktion von Mensch und Modell nur
-teilweise. Innerhalb des Systems interagieren mehrere logische Agentenrollen,
-gegenüber der Lernumgebung ist der Workflow zugleich ein gemeinsamer
-Tutorakteur.
+teilweise. Innerhalb des Systems kooperieren drei unterscheidbare Agenten über
+Nachrichten. Gegenüber der Lernumgebung bildet das hierarchische MAS zugleich
+einen gemeinsamen Tutorakteur.

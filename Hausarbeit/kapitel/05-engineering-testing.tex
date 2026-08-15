@@ -3,63 +3,92 @@
 
 \subsection{Framework- und Implementierungsentscheidungen}
 
-Statt eines Agentenframeworks wie LangGraph implementiert StudyMummy den festen
-Workflow mit kleinen asynchronen Python-Klassen. Für drei lineare Rollen ist
-dies nachvollziehbar: Kontrollfluss, Fehlerpfade und Toolrechte bleiben direkt
-im Code sichtbar, zusätzliche Laufzeitabstraktion entfällt. Pydantic-Modelle
-bilden Verträge für Kontext, Plan, Review und API-Antwort, FastAPI integriert
-Authentifizierung und Dependency Injection, SQLAlchemy kapselt persistente
-Zustände. Der Preis der Eigenimplementierung ist ebenfalls im Code sichtbar:
-Checkpoints, Replanning, Zustandsgraph und Transaktionsgrenzen über mehrere
-Agentenschritte müssen manuell gebaut werden.
+Die MAS-Laufzeit ist bewusst ohne zusätzliches Agentenframework implementiert.
+\texttt{MASAgent} definiert den gemeinsamen Agentenvertrag,
+\texttt{MASMessageBus} eine FIFO-Mailbox mit sanitisiertem Kommunikations-Trace
+und \texttt{AgentBlackboard} den gemeinsamen Laufzustand. Der Orchestrator
+kennt Agentenregister, Nachrichtenwarteschlange und Abbruchgrenze, aber nicht
+die fachliche Entscheidung: Das Routing nach Kritik erzeugt der Reviewer.
+Pydantic validiert Pläne, Reviews, Nachrichten, Toolstatus, lokale Zustände und
+API-Antworten. Sämtliche Laufobjekte werden je Request erzeugt. Dadurch teilt
+der globale FastAPI-Orchestrator keinen veränderlichen Agentenzustand zwischen
+parallelen Nutzern.
 
-Der OpenAI-kompatible Adapter isoliert Providerunterschiede, setzt Timeouts und
-liefert deterministische Fallbacks für strukturelle Agentenaufrufe. Die Tool
-Registry trennt JSON-Schema von Implementierung, die zusätzliche
-\texttt{SAFE\_TOOL\_POLICY} folgt dem Least-Privilege-Prinzip. Trace-IDs im
-Logging-Middleware und Phasenlaufzeiten unterstützen Beobachtbarkeit, wobei
-kein externes Trace-Backend oder persistenter vollständiger Agentenlauf
-implementiert ist. Angular und REST halten UI und Agentenlogik getrennt,
-Docker Compose reproduziert PostgreSQL/pgvector, Backend und Frontend.
+Diese Eigenimplementierung hält den kleinen Zustandsgraphen und die
+Capability-Policy direkt prüfbar. Ein graphorientiertes Framework wäre bei
+persistenten Checkpoints, vielen Verzweigungen oder Human-in-the-Loop-Pausen
+neu abzuwägen. Gegenwärtig würde es zusätzliche Abhängigkeit und Migration
+erzeugen, ohne eine benötigte Funktion zu ersetzen. Der Preis des eigenen
+Runtimes bleibt Wartungsaufwand: Zustandsmigration, Wiederaufnahme und
+verteilte Ausführung müssten selbst entwickelt werden. Das System ist
+asynchron programmiert, dispatcht die Agenten aber absichtlich seriell.
 
-\subsection{Testfaelle und Beobachtungen}
+Der OpenAI-kompatible Adapter kapselt JSON-Modus und Function Calling. Die
+Tool-Registry trennt Schema und Implementierung, während
+\texttt{SAFE\_TOOL\_POLICY} Rechte aktionsabhängig reduziert. Toolresultate
+werden als Erfolg, Fehler, Blockade oder Argumentfehler typisiert. Der Reviewer
+kann auf dieser Basis Textrevision oder Neuplanung auslösen. Ein Limit von eins
+bis vier, standardmäßig zwei Koordinationsrunden verhindert Endlosschleifen.
+Weiterhin fehlen persistente Checkpoints, Retries mit Backoff und ein
+transaktionales Zurückrollen bereits ausgeführter Tools.
 
-Am 6.~August~2026 wurde im vorhandenen Backend-Virtualenv ein Pytest-Lauf mit
-den Optionen \texttt{-q -p no:cacheprovider} ausgeführt. Ergebnis: 37 Tests
-bestanden in 10,68~s, beobachtet wurde eine
-\texttt{StarletteDeprecation\allowbreak{}Warning}. Es erfolgte kein
-Live-LLM-Aufruf.
+\subsection{Testfälle und Beobachtungen}
+
+Alle 64 Tests bestanden. Die einzige Warnung betrifft die künftige
+Umstellung des Starlette-Testclients. Zusätzlich bestanden zehn Angular-Tests
+und der Angular-Produktionsbuild. Beide Docker-Compose-Profile wurden
+erfolgreich aufgelöst. Die drei in \Cref{tab:tests} ausgewählten Tests
+adressieren gerade die Merkmale, die eine Rollen-Pipeline nicht belegen könnte.
+
+Ein ergänzender Live-End-to-End-Lauf mit dem konfigurierten OpenAI-Modell
+verarbeitete ein zweiseitiges Test-PDF zu vier Aufgaben, einem Quiz mit sechs
+Fragen und einem Merkblatt. Der Hinweis-Turn beteiligte Planner, Tutor und
+Reviewer über sechs Nachrichten und zwei Runden. Im Bewertungsturn wurde
+\texttt{evaluate\_answer} mit Status \texttt{succeeded} protokolliert. Eine
+dokumentgestützte Multiple-Choice-Übung wurde ebenfalls erzeugt. Der Lauf ist
+ein Integrationsnachweis, aber keine Nutzerstudie.
 
 \begin{table}[htbp]
   \centering
   \footnotesize
-  \begin{tabularx}{\linewidth}{@{}p{0.27\linewidth}XX@{}}
+  \begin{tabularx}{\linewidth}{@{}p{0.25\linewidth}XX@{}}
     \toprule
     Testfall & Prüfkriterium & Beobachtung \\
     \midrule
-    Capability-Policy & Ein modellseitiger Plan fordert
-    \texttt{evaluate\_answer}, Kalender- und unbekanntes Tool. Erlaubt bleiben
-    muss nur die zum Aktionstyp passende Schnittstelle. & Test bestanden,
-    Ergebnisliste enthielt ausschließlich \texttt{evaluate\_answer}. \\
-    Reviewer-Revision & Unsicherer Entwurf enthält sofort die vollständige
-    Lösung. Semantische Assertion: Die ausgelieferte Revision beginnt mit einer
-    aktivierenden Zusammenhangsfrage und der Trace meldet Überarbeitung. & Test
-    bestanden, der Entwurf wurde ersetzt. \\
-    Semantische Laufbewertung & Eine Antwort muss nicht wortgleich sein, aber
-    eine Frage oder Führung enthalten, direkte Lösungsmuster vermeiden,
-    erwartete Tools abdecken und eine achtstellige Trace-ID besitzen. & Test
-    bestanden, das regelbasierte Urteil war \texttt{socratic\_stable}. \\
+    Nachrichten und lokaler Zustand & Erwartet werden die typisierte Folge
+    \texttt{plan\_request}, \texttt{execute\_plan},
+    \texttt{review\_request}, \texttt{final\_response} sowie je eine lokale
+    Entscheidung der drei Agenten. & Test bestanden. Die Empfängerfolge war
+    Planner, Tutor, Reviewer, Coordinator. \\
+    Reviewer-Revision & Ein Entwurf verrät die Lösung. Der Reviewer muss Kritik
+    an den Tutor senden. Die toolfreie Revision wird erneut geprüft. & Test
+    bestanden. Es gab zwei Runden, zwei Tutor- und zwei Reviewer-Entscheidungen. Die
+    textbezogene Assertion prüft den Beginn der ausgelieferten Frage. \\
+    Neuplanung nach Toolfehler & Eine fehlgeschlagene
+    \texttt{evaluate\_answer}-Beobachtung muss den Reviewer zu
+    \texttt{replan\_request} und den Planner zu einem neuen
+    \texttt{clarify}-Plan veranlassen. & Test bestanden. Der zweite Plan und
+    die Fehlerbeobachtung waren im Laufzustand nachweisbar. \\
     \bottomrule
   \end{tabularx}
-  \caption{Ausgewählte, tatsächlich ausgeführte Backend-Tests.}
+  \caption{Ausgewählte, tatsächlich ausgeführte MAS-Tests.}
   \label{tab:tests}
 \end{table}
 
-Zwei zusätzliche Beobachtungen begrenzen die Aussagekraft. Das semantische
-Experimentierskript des Backends brach vor einer Ergebnistabelle mit
-\texttt{AttributeError} ab, weil der simulierte Tool Call kein Feld
-\texttt{type} besitzt. Frontend-Tests wurden nicht ausgeführt: Angular verlangt
-Node~22.22.3, 24.15.0 oder 26, verfügbar waren 24.11.0 und 24.14.0. Deshalb
-werden weder Ergebnisse dieses Experiments noch Frontend-Erfolgszahlen
-behauptet. Die bestandenen Tests decken vor allem Verträge und Fallbacks mit
-Mocks ab, nicht fachliche Tutorqualität oder realen Mehrsitzungs-Lernerfolg.
+Die markerbasierten semantischen Assertions des kontrollierten Experiments
+nutzen vorgegebene Modellantworten, aber den produktiven Tool- und
+MAS-Kontrollfluss. Die
+ReAct-Variante erreichte bei drei konstruierten Läufen Score und Tool-Abdeckung
+von 1,00. Die handgefertigte Baseline erreichte 0,27 beziehungsweise 0,00. Ein zusätzlicher
+MAS-Lauf erzeugte reproduzierbar \texttt{plan\_request} $\rightarrow$
+\texttt{execute\_plan} $\rightarrow$ \texttt{review\_request} $\rightarrow$
+\texttt{revision\_request} $\rightarrow$ \texttt{review\_request}
+$\rightarrow$ \texttt{final\_response} und endete nach zwei Runden mit einer
+sokratischen Frage. Dies belegt
+Nachrichtenrouting und Rückkopplung, nicht fachliche Modellqualität.
+
+Aussagen zu Tutorqualität und Lernfortschritt benötigen deshalb Live-LLM- und
+Nutzerstudien. Die Angular-Suite prüft UI-Komponenten. Jede neue Tutorantwort
+zeigt außerdem eine aufklappbare Zusammenfassung aus beteiligten
+Agenten, Rundenzahl, Nachrichtentypen und Toolstatus. Vollständige Payloads
+bleiben auf die interne Laufzeit beschränkt.
